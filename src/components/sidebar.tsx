@@ -26,7 +26,7 @@ export function Sidebar({ name }: { name: string }) {
   return (
     <aside className="sidebar">
       <Link href="/home" className="brand">
-        Teynur OS
+        Hub
       </Link>
       <nav aria-label="Hoofdmenu">
         {items.map(({ href, label, icon: Icon }) => (

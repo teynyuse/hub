@@ -4,7 +4,7 @@ export default function Setup() {
   if (isConfigured()) redirect("/login");
   return (
     <main className="setup-container">
-      <h1>Teynur OS instellen</h1>
+      <h1>Hub instellen</h1>
       <p className="section-space">De app heeft nog geen verbinding met je Supabase-project.</p>
       <ol>
         <li>

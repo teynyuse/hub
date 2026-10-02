@@ -9,7 +9,7 @@ export default async function Login() {
   if (data.user) redirect("/home");
   return (
     <main className="auth-container">
-      <h1>Teynur OS</h1>
+      <h1>Hub</h1>
       <p className="muted">Log in op je eigen ruimte.</p>
       <AuthForm />
     </main>

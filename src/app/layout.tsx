@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: { default: "Teynur OS", template: "%s · Teynur OS" },
+  title: { default: "Hub", template: "%s · Hub" },
   description: "Je persoonlijke overzicht voor mails, geld, planning en documenten.",
   robots: { index: false, follow: false },
 };

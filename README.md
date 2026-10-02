@@ -1,4 +1,4 @@
-# Teynur OS
+# Hub
 
 Een eenvoudige persoonlijke webapp met een vaste sidebar, eigen pagina’s en een aanpasbare Home. De naam is de productnaam: je eigen naam komt uit je profiel. Ieder account krijgt zijn eigen gegevens.
 
@@ -195,7 +195,7 @@ Next.js verzorgt de interface én serverlogica. Acties controleren de ingelogde 
 
 ## 6. Meerdere gebruikers
 
-Teynur OS is van bij de start gebouwd voor meerdere accounts:
+Hub is van bij de start gebouwd voor meerdere accounts:
 
 - Naam, tijdzone, munt en widgetindeling horen bij een profiel.
 - Elke module bewaart gegevens met een `user_id`.
