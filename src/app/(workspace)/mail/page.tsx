@@ -7,7 +7,7 @@ import { isRelevantMail, mailCategories, CLASSIFICATION_VERSION } from "@/featur
 import { ActionForm } from "@/components/action-form";
 import type { Email } from "@/lib/types";
 import { dateLabel } from "@/lib/format";
-export const maxDuration = 120;
+export const maxDuration = 300;
 export default async function Mail({
   searchParams,
 }: {
@@ -104,8 +104,8 @@ export default async function Mail({
             {connection.last_synced_at
               ? `Laatst bijgewerkt: ${dateLabel(connection.last_synced_at, profile.timezone)}.`
               : "Nog niet gesynchroniseerd."}{" "}
-            Per synchronisatie worden maximaal de laatste 200 inboxmails ingedeeld. Er wordt niets
-            verwijderd of aangepast in Gmail.
+            Per synchronisatie worden maximaal de laatste 200 inboxmails ingedeeld. Dit kan ongeveer
+            twee minuten duren. Er wordt niets verwijderd of aangepast in Gmail.
           </p>
         )}
       </div>

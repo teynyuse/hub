@@ -69,7 +69,7 @@ describe("Gmail API failure handling", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(log).not.toHaveBeenCalled();
   });
-  it("stops after three requests when a transient error persists", async () => {
+  it("stops after five requests when a transient error persists", async () => {
     vi.useFakeTimers();
     fetchMock.mockImplementation(() =>
       Promise.resolve(failure(403, { errors: [{ reason: "userRateLimitExceeded" }] })),
@@ -80,6 +80,6 @@ describe("Gmail API failure handling", () => {
     });
     await vi.runAllTimersAsync();
     expect((await result).message).toContain("403 / userRateLimitExceeded / messages.list");
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 });

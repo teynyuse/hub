@@ -80,11 +80,14 @@ export async function syncGmail(): Promise<ActionState> {
     ids.splice(200);
     const messages: ReturnType<typeof classifiedMessage>[] = [];
     // Read bodies on the server; only a short plain-text preview is persisted.
-    for (let i = 0; i < ids.length; i += 5) {
+    // Pace full-message reads: at most two at once, with a second between batches.
+    // Gmail charges quota units per read, even when no message is changed.
+    for (let i = 0; i < ids.length; i += 2) {
+      if (i > 0) await new Promise((resolve) => setTimeout(resolve, 1000));
       messages.push(
         ...(
           await Promise.all(
-            ids.slice(i, i + 5).map(async (m) => {
+            ids.slice(i, i + 2).map(async (m) => {
               try {
                 return classifiedMessage(
                   await googleGet<GoogleMessage>(

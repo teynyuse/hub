@@ -55,8 +55,9 @@ export async function googleGet<T>(path: string, token: string): Promise<T> {
     if (response.ok) return response.json();
     const detail: unknown = await response.json().catch(() => null);
     const error = new GmailApiError(response.status, gmailErrorReason(detail), operation);
-    if (error.retryable && attempt < 2) {
-      await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
+    if (error.retryable && attempt < 4) {
+      const delay = 1000 * 2 ** attempt + Math.floor(Math.random() * 1000);
+      await new Promise((resolve) => setTimeout(resolve, delay));
       continue;
     }
     // Fixed identifiers only: never log a token, message ID, or Google's raw error body.
