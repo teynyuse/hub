@@ -33,6 +33,7 @@ vi.mock("@/features/mail/google", async (original) => ({
   googleToken: mocks.token,
 }));
 import { syncGmail } from "@/features/mail/actions";
+import { GmailApiError } from "@/features/mail/google";
 const body = (text: string) => ({
   mimeType: "text/plain",
   body: { data: Buffer.from(text).toString("base64url") },
@@ -46,6 +47,24 @@ beforeEach(() => {
   mocks.stamp.mockResolvedValue({ error: null });
 });
 describe("Gmail content sync", () => {
+  it("continues when a mail was deleted after listing it", async () => {
+    mocks.get.mockImplementation(async (path: string) => {
+      if (path.startsWith("messages?")) return { messages: [{ id: "gone" }, { id: "bill" }] };
+      if (path.includes("/gone?")) throw new GmailApiError(404, "notFound", "messages.get");
+      return {
+        id: "bill",
+        internalDate: "1790985600000",
+        labelIds: ["INBOX"],
+        payload: {
+          ...body("Uw factuur. Te betalen €42."),
+          headers: [{ name: "Subject", value: "Factuur" }],
+        },
+      };
+    });
+    expect((await syncGmail()).success).toContain("1 mails");
+    expect(mocks.rpc.mock.calls[0][1].items).toHaveLength(1);
+    expect(mocks.stamp).toHaveBeenCalledTimes(1);
+  });
   it("requires renewed body access before requesting any mails", async () => {
     mocks.connection.granted_scope = "https://www.googleapis.com/auth/gmail.metadata";
     expect((await syncGmail()).error).toContain("opnieuw");

@@ -5,7 +5,14 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "node:crypto";
 import { requireUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { googleConfig, googleToken, googleGet, GMAIL_SCOPE, canReadMail } from "./google";
+import {
+  googleConfig,
+  googleToken,
+  googleGet,
+  GMAIL_SCOPE,
+  canReadMail,
+  GmailApiError,
+} from "./google";
 import { decryptToken } from "./crypto";
 import { classifiedMessage, type GoogleMessage } from "./message";
 import { validationMessage } from "@/lib/validation";
@@ -75,21 +82,27 @@ export async function syncGmail(): Promise<ActionState> {
     // Read bodies on the server; only a short plain-text preview is persisted.
     for (let i = 0; i < ids.length; i += 5) {
       messages.push(
-        ...(await Promise.all(
-          ids
-            .slice(i, i + 5)
-            .map(async (m) =>
-              classifiedMessage(
-                await googleGet<GoogleMessage>(
-                  `messages/${encodeURIComponent(m.id)}?format=full`,
-                  tokens.access_token,
-                ),
-              ),
-            ),
-        )),
+        ...(
+          await Promise.all(
+            ids.slice(i, i + 5).map(async (m) => {
+              try {
+                return classifiedMessage(
+                  await googleGet<GoogleMessage>(
+                    `messages/${encodeURIComponent(m.id)}?format=full`,
+                    tokens.access_token,
+                  ),
+                );
+              } catch (error) {
+                // A mail may be deleted between listing and reading it.
+                if (error instanceof GmailApiError && error.status === 404) return null;
+                throw error;
+              }
+            }),
+          )
+        ).filter((message) => message !== null),
       );
     }
-    if (ids.length) {
+    if (messages.length) {
       const batch = messages;
       const { error: writeError } = await db.rpc("sync_gmail_messages", { items: batch });
       if (writeError) throw new Error("Mails opslaan lukte niet. Probeer opnieuw.");
