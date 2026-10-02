@@ -1,7 +1,10 @@
-export const CLASSIFICATION_VERSION = 1;
-export const relevantCategories = ["Facturen", "School", "Werk", "Overheid"] as const;
+export const CLASSIFICATION_VERSION = 2;
+export const relevantCategories = ["Facturen"] as const;
 export const mailCategories = [
   ...relevantCategories,
+  "School",
+  "Werk",
+  "Overheid",
   "Accountmeldingen",
   "Nieuwsbrieven",
   "Bestellingen",
@@ -38,12 +41,29 @@ export function classifyMail(
   const foodDelivery =
     /\b(takeaway|thuisbezorgd|ubereats|uber eats|deliveroo)\b/.test(from) ||
     /@(.*\.)?(takeaway\.com|thuisbezorgd\.nl|deliveroo\.[a-z.]+)\b/.test(from);
+  const shopSender =
+    /\b(zalando|amazon|bol\.com|coolblue|mediamarkt|media markt|temu|shein|vinted|aliexpress|ebay|ikea|h&m)\b/.test(
+      from,
+    ) || /@(?:[a-z0-9-]+\.)*(?:zara|hm|bol)\.[a-z.]+\b/.test(from);
+  const householdProvider =
+    /\b(engie|electrabel|luminus|eneco|totalenergies|fluvius|farys|de watergroep|pidpa|vivaqua|proximus|telenet|scarlet|mobile vikings|ethias|dvv|axa|allianz|ag insurance|acv|abvv|aclvb|helan|solidaris|partenamut)\b/.test(
+      from,
+    ) ||
+    /@(?:[a-z0-9-]+\.)*(?:hetacv\.be|acv-online\.be|cm\.be|lm\.be|mega\.be|orange\.be|kbc\.be|belfius\.be)\b/.test(
+      from,
+    );
+  // An unknown sender can still qualify from a clear household expense in the text.
+  // Do not treat a generic webshop invoice as a household bill.
+  const householdExpense =
+    /\b(energiefactuur|elektriciteit|elektriciteitsfactuur|gasfactuur|waterfactuur|waterverbruik|energieverbruik|energiecontract|gasverbruik|verzekeringspremie|verzekering|verzekeringen|polisnummer|hospitalisatie|autoverzekering|brandverzekering|familiale|mutualiteit|ziekenfonds|vakbond|vakbondsbijdrage|syndicale bijdrage|lidgeld|lidmaatschapsbijdrage|ledenbijdrage|internetabonnement|telecom|huur|huurgeld|huurbetaling|hypotheek|vme|syndicus|electricity|utility bill|insurance premium|insurance policy|membership fee)\b/.test(
+      `${heading} ${content.slice(0, 4000)}`,
+    );
   const marketingSubject =
     /\b(nieuwsbrief|newsletter|kortingscode|promo(?:tie|ties)?|coupon|sale|black friday|flash sale)\b|\b\d+\s*%\s*(?:korting|off)|speciale aanbieding|special offer|exclusieve aanbieding/.test(
       heading,
     );
   const invoiceHeading =
-    /\b(factuur|invoice|betalingsherinnering|aanmaning|afrekening)\b|payment due|billing statement|rekening (?:voor|van|over)|uw rekening|je rekening/.test(
+    /\b(factuur|invoice|betalingsherinnering|aanmaning|afrekening|betalingsuitnodiging|betaalverzoek|voorschotfactuur|premienota|lidgeld|lidmaatschapsbijdrage|ledenbijdrage|vakbondsbijdrage)\b|payment due|billing statement|rekening (?:voor|van|over)|uw rekening|je rekening|(?:maandelijkse|jaarlijkse) (?:premie|bijdrage|voorschot)|(?:premie|bijdrage|voorschot) (?:voor|\d{4})/.test(
       heading,
     );
   const invoiceBody =
@@ -52,15 +72,22 @@ export function classifyMail(
       content,
     );
   const invoiceAttachment = attachmentNames.some((name) =>
-    /\b(factuur|invoice)[\s_.-]/.test(normalize(name)),
+    /\b(factuur|invoice)(?:[\s_.-]|\d|$)/.test(normalize(name)),
   );
+  const paymentRequest =
+    /\b(te betalen|verschuldigd|gelieve te betalen|gelieve.*(?:storten|overschrijven)|betaal (?:je|uw|voor)|betaling.*(?:vervaldatum|uiterlijk)|premie.*(?:vervaldatum|domiciliering)|amount due|payment due|please pay)\b/.test(
+      text,
+    );
+  const householdBill =
+    (householdProvider || householdExpense) &&
+    (invoiceHeading || invoiceBody || invoiceAttachment || paymentRequest);
   let category = "Overig";
   // Account alerts and food orders stay out of the relevant inbox, even when starred.
   if (labels.includes("SPAM") || labels.includes("TRASH")) category = "Nieuwsbrieven";
   else if (accountNotice) category = "Accountmeldingen";
-  else if (foodDelivery) category = "Bestellingen";
+  else if (foodDelivery || shopSender) category = "Bestellingen";
   else if (marketingSubject) category = "Nieuwsbrieven";
-  else if (invoiceHeading || invoiceBody || invoiceAttachment) category = "Facturen";
+  else if (householdBill) category = "Facturen";
   else if (
     labels.includes("CATEGORY_PROMOTIONS") ||
     labels.includes("CATEGORY_SOCIAL") ||

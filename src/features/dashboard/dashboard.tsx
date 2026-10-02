@@ -162,7 +162,7 @@ function WidgetContent({ type, data }: { type: WidgetType; data: DashboardData }
             ))}
           </ul>
         ) : (
-          <p className="muted">Geen relevante mails.</p>
+          <p className="muted">Geen facturen voor vaste kosten.</p>
         )}
         <Link className="text-link" href="/mail">
           Open Mail

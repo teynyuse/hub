@@ -3,7 +3,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { getRows, getProfile } from "@/features/data/queries";
 import { gmailConfigured, canReadMail } from "@/features/mail/google";
 import { connectGmail, syncGmail, disconnectGmail } from "@/features/mail/actions";
-import { isRelevantMail, mailCategories, CLASSIFICATION_VERSION } from "@/features/mail/classify";
+import { isRelevantMail, CLASSIFICATION_VERSION } from "@/features/mail/classify";
 import { ActionForm } from "@/components/action-form";
 import type { Email } from "@/lib/types";
 import { dateLabel } from "@/lib/format";
@@ -12,8 +12,6 @@ export default async function Mail({
   searchParams,
 }: {
   searchParams: Promise<{
-    category?: string;
-    important?: string;
     error?: string;
     connected?: string;
   }>;
@@ -39,18 +37,7 @@ export default async function Mail({
     connection = data;
   }
   const needsReconnect = connection && !canReadMail(connection.granted_scope);
-  const category =
-    params.category === "all" || mailCategories.some((c) => c === params.category)
-      ? params.category
-      : "relevant";
-  const visible = emails.filter(
-    (e) =>
-      (category === "all" ||
-        (category === "relevant"
-          ? isRelevantMail(e)
-          : e.classification_version === CLASSIFICATION_VERSION && e.category === category)) &&
-      (params.important !== "1" || e.important),
-  );
+  const visible = emails.filter(isRelevantMail);
   return (
     <>
       <div className="page-heading">
@@ -60,8 +47,8 @@ export default async function Mail({
         )}
       </div>
       <p className="muted">
-        Facturen, school, werk en overheid worden automatisch herkend. Reclame, accountmeldingen en
-        bestellingen staan bij Alle mails.
+        Alleen facturen en betalingsverzoeken voor energie, water, telecom, verzekeringen en
+        bijdragen.
       </p>
       {params.error && (
         <p className="error" role="alert">
@@ -71,9 +58,7 @@ export default async function Mail({
         </p>
       )}
       {params.connected && (
-        <p role="status">
-          Gmail is gekoppeld. Klik op Synchroniseren om mails automatisch in te delen.
-        </p>
+        <p role="status">Gmail is gekoppeld. Klik op Synchroniseren om je facturen op te halen.</p>
       )}
       <div className="panel section-space">
         <div className="row">
@@ -109,34 +94,13 @@ export default async function Mail({
           </p>
         )}
       </div>
-      {emails.some((e) => e.classification_version !== CLASSIFICATION_VERSION) && (
-        <p className="muted section-space">
-          Er zijn nog mails zonder inhoudsanalyse. Synchroniseer opnieuw; oudere mails buiten de
-          laatste 200 vind je bij Alle mails.
-        </p>
-      )}
-      <form className="filter-form section-space">
-        <label>
-          Weergave
-          <select name="category" defaultValue={category}>
-            <option value="relevant">Relevant</option>
-            <option value="all">Alle mails</option>
-            {mailCategories.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </label>
-        <label className="checkbox-label">
-          <input
-            name="important"
-            type="checkbox"
-            value="1"
-            defaultChecked={params.important === "1"}
-          />
-          Alleen belangrijk
-        </label>
-        <button>Toepassen</button>
-      </form>
+      {emails.length > 0 &&
+        !emails.some((e) => e.classification_version === CLASSIFICATION_VERSION) && (
+          <p className="muted section-space">
+            Klik op Synchroniseren om je laatste 200 inboxmails opnieuw te controleren met de
+            facturenfilter.
+          </p>
+        )}
       <section className="panel section-space">
         {visible.length ? (
           visible.map((e) => (
@@ -169,7 +133,7 @@ export default async function Mail({
             </article>
           ))
         ) : (
-          <p className="muted">Geen mails in deze selectie.</p>
+          <p className="muted">Geen facturen voor vaste kosten gevonden.</p>
         )}
       </section>
     </>

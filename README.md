@@ -6,17 +6,17 @@ Dit is een werkende eerste versie met Next.js, TypeScript, Tailwind CSS, Supabas
 
 ## Wat zit erin?
 
-| Onderdeel | Eerste versie                                                                                                                                            |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Account   | Registreren met naam, e-mail en wachtwoord, e-mail bevestigen, inloggen, uitloggen                                                                       |
-| Home      | Widgets toevoegen, verwijderen, verslepen en smal/breed maken; indeling bewaren per gebruiker                                                            |
-| Mail      | Eén Gmail-account per gebruiker, automatisch sorteren op inhoud, standaard alleen relevante mails, openen in Gmail, ontkoppelen |
-| Money     | Handmatig inkomsten en uitgaven invoeren, maand kiezen, bedragen en grafiek bekijken, betalingen bijhouden                                               |
-| Calendar  | Eigen afspraken toevoegen, chronologisch bekijken en verwijderen                                                                                         |
-| Tasks     | Taken met optionele deadline toevoegen, afronden, heropenen en verwijderen                                                                               |
-| Space     | Pagina’s maken en bewaren; tekst, koppen, lijsten, vet, cursief, citaten en undo                                                                         |
-| Files     | Privébestanden uploaden, downloaden en verwijderen; maximaal 4 MB per bestand                                                                            |
-| Settings  | Naam, tijdzone en munt kiezen                                                                                                                            |
+| Onderdeel | Eerste versie                                                                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Account   | Registreren met naam, e-mail en wachtwoord, e-mail bevestigen, inloggen, uitloggen                                                                     |
+| Home      | Widgets toevoegen, verwijderen, verslepen en smal/breed maken; indeling bewaren per gebruiker                                                          |
+| Mail      | Eén Gmail-account per gebruiker, automatisch sorteren op inhoud, alleen facturen en betalingsverzoeken voor vaste kosten, openen in Gmail, ontkoppelen |
+| Money     | Handmatig inkomsten en uitgaven invoeren, maand kiezen, bedragen en grafiek bekijken, betalingen bijhouden                                             |
+| Calendar  | Eigen afspraken toevoegen, chronologisch bekijken en verwijderen                                                                                       |
+| Tasks     | Taken met optionele deadline toevoegen, afronden, heropenen en verwijderen                                                                             |
+| Space     | Pagina’s maken en bewaren; tekst, koppen, lijsten, vet, cursief, citaten en undo                                                                       |
+| Files     | Privébestanden uploaden, downloaden en verwijderen; maximaal 4 MB per bestand                                                                          |
+| Settings  | Naam, tijdzone en munt kiezen                                                                                                                          |
 
 Het systeem verstuurt nog geen pushmeldingen. De widget **Aandacht nodig** toont belangrijke ongelezen mails, betalingen vandaag of te laat, en verlopen taken. Er is nog geen bankkoppeling, Google Calendar-sync, AI, automatische factuurherkenning, bestandsbewerking, geneste pagina-interface of volledige Notion-blokeditor.
 
@@ -148,10 +148,10 @@ TOKEN_ENCRYPTION_KEY=jouw-gegenereerde-sleutel
 - Synchroniseren leest maximaal de laatste **200 inboxmails**, verdeeld over twee Gmail-resultaatpagina's. Het is geen volledige import; archiveren/verwijderen in Gmail wordt nog niet gespiegeld.
 - De scope `gmail.readonly` staat toe de mailtekst te lezen. De app vraagt geen schrijf- of verzendrechten.
 - Multipart-mail wordt uitgepakt; gewone tekst krijgt voorrang, HTML wordt omgezet in tekst. Bijlagen worden niet gedownload of inhoudelijk gelezen. Afzender, onderwerp, labels, mailtekst (maximaal 24.000 tekens) en bijlagenamen dienen als signalen.
-- Facturen, School, Werk en Overheid worden automatisch ingedeeld en standaard getoond bij **Relevant**, ook op Home. Reclame, accountmeldingen en bestellingen (zoals Takeaway) blijven uit deze weergave.
-- **Alle mails** geeft toegang tot verborgen of niet-herkende mails. Onzekere berichten blijven **Overig**; regels kunnen fouten maken. Dit is lokale herkenning, geen externe AI-service of betaald model. Geen automatische handelingen op basis van mailinhoud.
+- Mail en Home tonen alleen facturen en betalingsverzoeken voor vaste kosten: energie, water, telecom, verzekeringen, huur en bijdragen aan bijvoorbeeld een vakbond of ziekenfonds. Zowel een betalingssignaal als een passende afzender of duidelijk soort kosten is vereist. Webwinkels zoals Zalando en maaltijdleveranciers worden uitgesloten, ook wanneer ze een factuur sturen.
+- School, werk, reclame en overige berichten worden niet getoond. Onzekere berichten blijven buiten de weergave; lokale regels kunnen facturen missen of verkeerd herkennen. Dit is geen externe AI-service of betaald model. Geen automatische handelingen op basis van mailinhoud.
 - Alleen metadata, de categorie en een tekstvoorbeeld van maximaal 240 tekens worden bewaard, niet de volledige mailtekst of bijlagen. HTML wordt nooit als HTML getoond.
-- Elke synchronisatie berekent de categorie en belangrijk-markering opnieuw. Handmatige categorieformulieren zijn verwijderd. Oude mails zonder inhoudsanalyse blijven buiten Relevant tot ze opnieuw zijn verwerkt.
+- Elke synchronisatie berekent de categorie en belangrijk-markering opnieuw. Handmatige categorieformulieren zijn verwijderd. Na een wijziging van de herkenningsregels blijven oudere classificaties verborgen tot opnieuw synchroniseren.
 - Mails worden niet verstuurd, verwijderd, gelezen gemarkeerd of verplaatst in Gmail. Je opent de inhoud via **Open in Gmail**.
 - Google refresh tokens zijn versleuteld met AES-256-GCM, inclusief binding aan het gebruikers-ID. De token-tabel is voor normale gebruikers helemaal ontoegankelijk.
 - Bij ontkoppelen wordt Google-toegang ingetrokken en worden opgeslagen mailgegevens verwijderd. Bij koppelen van een ander Gmail-adres worden de mails van het vorige adres verwijderd.

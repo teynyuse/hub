@@ -33,6 +33,7 @@ vi.mock("@/features/mail/google", async (original) => ({
   googleToken: mocks.token,
 }));
 import { syncGmail } from "@/features/mail/actions";
+import { CLASSIFICATION_VERSION } from "@/features/mail/classify";
 import { GmailApiError } from "@/features/mail/google";
 const body = (text: string) => ({
   mimeType: "text/plain",
@@ -69,7 +70,7 @@ describe("Gmail content sync", () => {
       return {
         id: path.split("/")[1].split("?")[0],
         internalDate: "1790985600000",
-        payload: body("Uw factuur. Te betalen €42."),
+        payload: body("Uw factuur voor elektriciteit. Te betalen €42."),
       };
     });
     expect((await runSync()).success).toContain("5 mails");
@@ -87,7 +88,7 @@ describe("Gmail content sync", () => {
         internalDate: "1790985600000",
         labelIds: ["INBOX"],
         payload: {
-          ...body("Uw factuur. Te betalen €42."),
+          ...body("Uw factuur voor elektriciteit. Te betalen €42."),
           headers: [{ name: "Subject", value: "Factuur" }],
         },
       };
@@ -122,7 +123,11 @@ describe("Gmail content sync", () => {
         internalDate: "1790985600000",
         labelIds: id === "bill" ? ["INBOX"] : ["INBOX", "CATEGORY_PROMOTIONS"],
         payload: {
-          ...body(id === "bill" ? "Bijgevoegd uw factuur. Te betalen €42." : "Shop now"),
+          ...body(
+            id === "bill"
+              ? "Bijgevoegd uw factuur voor elektriciteit. Te betalen €42."
+              : "Shop now",
+          ),
           headers: [
             { name: "Subject", value: "Document" },
             { name: "From", value: "service@example.com" },
@@ -139,7 +144,7 @@ describe("Gmail content sync", () => {
     expect(args.items.at(-1)).toMatchObject({
       gmail_id: "bill",
       category: "Facturen",
-      classification_version: 1,
+      classification_version: CLASSIFICATION_VERSION,
     });
     expect(args.items[0].category).toBe("Nieuwsbrieven");
     expect(args.items[0]).not.toHaveProperty("body");

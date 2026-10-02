@@ -13,10 +13,89 @@ const plain = (text: string): MessagePart => ({
 });
 describe("automatic sorting from message content", () => {
   it.each([
+    ["ENGIE <facturen@engie.be>", "Je factuur staat klaar", "Bekijk je document.", true],
+    ["Engie", "Je maandelijkse voorschot", "Te betalen €82 voor je energieverbruik.", true],
+    [
+      "Ethias",
+      "Uw jaarlijkse premie",
+      "Uw autoverzekering: gelieve te betalen voor 20 oktober.",
+      true,
+    ],
+    [
+      "ACV <noreply@hetacv.be>",
+      "Lidgeld 2026",
+      "Uw bijdrage is verschuldigd. Gelieve €25 over te schrijven.",
+      true,
+    ],
+    [
+      "service@example.com",
+      "Document beschikbaar",
+      "Uw verzekeringspremie. Te betalen €120 voor 20 oktober.",
+      true,
+    ],
+    [
+      "Farys",
+      "Afrekening",
+      "Je waterverbruik en het verschuldigde bedrag staan in de bijlage.",
+      true,
+    ],
+    ["Helan", "Je bijdrage voor 2026", "De jaarlijkse bijdrage bedraagt €105.", true],
+    ["Proximus", "Uw factuur", "Te betalen €55 voor uw abonnement.", true],
+    [
+      "Zalando <info@zalando.be>",
+      "Je factuur",
+      "Factuur kleding: te betalen €79. Verzekering van je pakket inbegrepen.",
+      false,
+    ],
+    ["Zalando", "Laatste betalingsherinnering", "Aanmaning voor je bestelling.", false],
+    ["Amazon", "Invoice October", "Insurance premium for your order. Amount due EUR 42.", false],
+    [
+      "Shop <contact@shop.example>",
+      "Factuur",
+      "Bijgevoegd uw factuur. Te betalen €42 voor je schoenen.",
+      false,
+    ],
+    ["Engie", "Nieuwsbrief oktober", "Lees onze tips over energie en je factuur.", false],
+    ["Engie", "20% korting", "Uw volgende energiefactuur wordt goedkoper. Bestel nu.", false],
+    ["ACV", "Nieuws uit de vakbond", "We verdedigen je rechten op het werk.", false],
+    ["AXA", "Wachtwoord gewijzigd", "Je wachtwoord voor je verzekering is gewijzigd.", false],
+    ["Artevelde", "Factuur cursus", "Bijgevoegd uw factuur. Te betalen €42 voor de cursus.", false],
+    ["Collega", "Teamoverleg morgen", "Vergadering over de factuur van onze klant.", false],
+    ["Engie", "Welkom", "Bedankt voor je nieuwe energiecontract.", false],
+  ])("shows household bill from %s / %s: %s", (sender, subject, body, expected) => {
+    const result = classifyMail(sender, subject, ["IMPORTANT"], body);
+    expect(isRelevantMail({ ...result, classification_version: CLASSIFICATION_VERSION })).toBe(
+      expected,
+    );
+    expect(result.important).toBe(expected);
+  });
+  it("requires a household expense even when an invoice PDF is attached", () => {
+    expect(classifyMail("Engie", "Document beschikbaar", [], "", ["factuur.pdf"]).category).toBe(
+      "Facturen",
+    );
+    expect(
+      classifyMail("Zalando", "Document beschikbaar", [], "", ["factuur_123.pdf"]).category,
+    ).toBe("Bestellingen");
+    expect(
+      classifyMail("unknown@example.com", "Document beschikbaar", [], "", ["factuur_123.pdf"])
+        .category,
+    ).toBe("Overig");
+  });
+  it("does not display bills classified under the old broader rules", () => {
+    expect(isRelevantMail({ category: "Facturen", classification_version: 1 })).toBe(false);
+    expect(
+      isRelevantMail({ category: "Facturen", classification_version: CLASSIFICATION_VERSION }),
+    ).toBe(true);
+    for (const category of ["School", "Werk", "Overheid", "Bestellingen"])
+      expect(isRelevantMail({ category, classification_version: CLASSIFICATION_VERSION })).toBe(
+        false,
+      );
+  });
+  it.each([
     [
       "service@example.com",
       "Even dit",
-      "Bijgevoegd uw factuur. Te betalen: €42 voor 20 oktober.",
+      "Bijgevoegd uw factuur voor elektriciteit. Te betalen: €42 voor 20 oktober.",
       [],
       "Facturen",
     ],
@@ -81,7 +160,7 @@ describe("automatic sorting from message content", () => {
     [
       "Provider",
       "Invoice October",
-      "Amount due EUR 55. Due date 20 October.",
+      "Insurance premium. Amount due EUR 55. Due date 20 October.",
       ["CATEGORY_PROMOTIONS"],
       "Facturen",
     ],
@@ -105,7 +184,7 @@ describe("automatic sorting from message content", () => {
     expect(isRelevantMail({ category: "Facturen", classification_version: 0 })).toBe(false);
     expect(
       isRelevantMail({ category: "School", classification_version: CLASSIFICATION_VERSION }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isRelevantMail({ category: "Nieuwsbrieven", classification_version: CLASSIFICATION_VERSION }),
     ).toBe(false);
@@ -176,7 +255,10 @@ describe("Gmail MIME extraction", () => {
           { name: "Subject", value: "Document beschikbaar" },
         ],
         parts: [
-          plain("Bijgevoegd uw factuur. Te betalen €42. " + "Private text ".repeat(100)),
+          plain(
+            "Bijgevoegd uw factuur voor elektriciteit. Te betalen €42. " +
+              "Private text ".repeat(100),
+          ),
           {
             mimeType: "application/pdf",
             filename: "factuur_123.pdf",

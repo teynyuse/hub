@@ -38,8 +38,9 @@ describe("mail", () => {
       important: false,
     });
   });
-  it("uses Gmail importance labels", () => {
-    expect(classifyMail("Collega", "Teamoverleg morgen", ["IMPORTANT"]).important).toBe(true);
+  it("uses Gmail importance labels only for household bills", () => {
+    expect(classifyMail("Collega", "Teamoverleg morgen", ["IMPORTANT"]).important).toBe(false);
+    expect(classifyMail("Engie", "Factuur oktober", ["IMPORTANT"]).important).toBe(true);
   });
 });
 describe("account secrets", () => {

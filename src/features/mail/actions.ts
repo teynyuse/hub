@@ -117,7 +117,7 @@ export async function syncGmail(): Promise<ActionState> {
     if (stampError) throw new Error("Synchronisatie afronden lukte niet.");
     revalidatePath("/", "layout");
     return {
-      success: `${messages.length} mails automatisch ingedeeld. Facturen, school, werk en overheid staan bij Relevant.`,
+      success: `${messages.length} mails gecontroleerd. Alleen facturen en betalingsverzoeken voor vaste kosten worden getoond.`,
     };
   } catch (e) {
     return { error: validationMessage(e) };
