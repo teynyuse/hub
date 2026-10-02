@@ -1,11 +1,10 @@
 import { requireUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
 import { getRows, getProfile } from "@/features/data/queries";
-import { gmailConfigured } from "@/features/mail/google";
+import { gmailConfigured, canReadMail } from "@/features/mail/google";
 import { connectGmail, syncGmail, disconnectGmail } from "@/features/mail/actions";
-import { updateEmail } from "@/features/data/actions";
+import { isRelevantMail, mailCategories, CLASSIFICATION_VERSION } from "@/features/mail/classify";
 import { ActionForm } from "@/components/action-form";
-import { categories } from "@/lib/validation";
 import type { Email } from "@/lib/types";
 import { dateLabel } from "@/lib/format";
 export const maxDuration = 120;
@@ -26,41 +25,64 @@ export default async function Mail({
     getProfile(),
   ]);
   const configured = gmailConfigured();
-  let connection: { email_address: string; last_synced_at: string | null } | null = null;
+  let connection: {
+    email_address: string;
+    last_synced_at: string | null;
+    granted_scope: string;
+  } | null = null;
   if (configured) {
     const { data } = await adminClient()
       .from("gmail_connections")
-      .select("email_address,last_synced_at")
+      .select("email_address,last_synced_at,granted_scope")
       .eq("user_id", user.id)
       .maybeSingle();
     connection = data;
   }
+  const needsReconnect = connection && !canReadMail(connection.granted_scope);
+  const category =
+    params.category === "all" || mailCategories.some((c) => c === params.category)
+      ? params.category
+      : "relevant";
   const visible = emails.filter(
     (e) =>
-      (!params.category || e.category === params.category) &&
+      (category === "all" ||
+        (category === "relevant"
+          ? isRelevantMail(e)
+          : e.classification_version === CLASSIFICATION_VERSION && e.category === category)) &&
       (params.important !== "1" || e.important),
   );
   return (
     <>
       <div className="page-heading">
         <h1>Mail</h1>
-        {connection && (
+        {connection && !needsReconnect && (
           <ActionForm action={syncGmail} submit="Synchroniseren" className="inline-form" />
         )}
       </div>
+      <p className="muted">
+        Facturen, school, werk en overheid worden automatisch herkend. Reclame, accountmeldingen en
+        bestellingen staan bij Alle mails.
+      </p>
       {params.error && (
         <p className="error" role="alert">
-          Gmail koppelen lukte niet. Controleer je Google-instellingen en probeer opnieuw.
+          {params.error === "scope"
+            ? "Geef Hub toestemming om mailinhoud te lezen en koppel Gmail opnieuw."
+            : "Gmail koppelen lukte niet. Controleer je Google-instellingen en probeer opnieuw."}
         </p>
       )}
       {params.connected && (
-        <p role="status">Gmail is gekoppeld. Klik op Synchroniseren om mails op te halen.</p>
+        <p role="status">
+          Gmail is gekoppeld. Klik op Synchroniseren om mails automatisch in te delen.
+        </p>
       )}
       <div className="panel section-space">
         <div className="row">
           {connection ? (
             <>
               <span>{connection.email_address}</span>
+              <form action={connectGmail}>
+                <button>{needsReconnect ? "Gmail opnieuw koppelen" : "Opnieuw koppelen"}</button>
+              </form>
               <ActionForm action={disconnectGmail} submit="Ontkoppelen" className="inline-form" />
             </>
           ) : configured ? (
@@ -68,27 +90,38 @@ export default async function Mail({
               <button className="primary">Gmail koppelen</button>
             </form>
           ) : (
-            <p className="muted">
-              Gmail is nog niet ingesteld. Volg de Gmail-stappen in README.md.
-            </p>
+            <p className="muted">Gmail is nog niet ingesteld.</p>
           )}
         </div>
-        {connection && (
+        {needsReconnect && (
+          <p className="section-space">
+            Koppel Gmail één keer opnieuw, zodat Hub de tekst kan lezen en je mails automatisch kan
+            sorteren.
+          </p>
+        )}
+        {connection && !needsReconnect && (
           <p className="muted section-space">
             {connection.last_synced_at
               ? `Laatst bijgewerkt: ${dateLabel(connection.last_synced_at, profile.timezone)}.`
               : "Nog niet gesynchroniseerd."}{" "}
-            Per synchronisatie worden de laatste 50 inboxmails gecontroleerd. Eerder opgeslagen
-            mails blijven zichtbaar.
+            Per synchronisatie worden maximaal de laatste 200 inboxmails ingedeeld. Er wordt niets
+            verwijderd of aangepast in Gmail.
           </p>
         )}
       </div>
+      {emails.some((e) => e.classification_version !== CLASSIFICATION_VERSION) && (
+        <p className="muted section-space">
+          Er zijn nog mails zonder inhoudsanalyse. Synchroniseer opnieuw; oudere mails buiten de
+          laatste 200 vind je bij Alle mails.
+        </p>
+      )}
       <form className="filter-form section-space">
         <label>
-          Categorie
-          <select name="category" defaultValue={params.category ?? ""}>
-            <option value="">Alle categorieën</option>
-            {categories.map((c) => (
+          Weergave
+          <select name="category" defaultValue={category}>
+            <option value="relevant">Relevant</option>
+            <option value="all">Alle mails</option>
+            {mailCategories.map((c) => (
               <option key={c}>{c}</option>
             ))}
           </select>
@@ -102,7 +135,7 @@ export default async function Mail({
           />
           Alleen belangrijk
         </label>
-        <button>Filteren</button>
+        <button>Toepassen</button>
       </form>
       <section className="panel section-space">
         {visible.length ? (
@@ -114,31 +147,25 @@ export default async function Mail({
               <p className="muted">
                 {e.sender} · {dateLabel(e.received_at, profile.timezone)}
               </p>
-              <ActionForm action={updateEmail} submit="Bewaren" className="mail-controls">
-                <input type="hidden" name="id" value={e.id} />
-                <label>
-                  Categorie
-                  <select name="category" defaultValue={e.category}>
-                    {categories.map((c) => (
-                      <option key={c}>{c}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="checkbox-label">
-                  <input type="checkbox" name="important" defaultChecked={e.important} />
-                  Belangrijk
-                </label>
-                {connection && (
-                  <a
-                    className="text-link"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    href={`https://mail.google.com/mail/u/?authuser=${encodeURIComponent(connection.email_address)}#all/${encodeURIComponent(e.gmail_id)}`}
-                  >
-                    Open in Gmail
-                  </a>
-                )}
-              </ActionForm>
+              <p>
+                <span className="badge">
+                  {e.classification_version === CLASSIFICATION_VERSION
+                    ? e.category
+                    : "Nog niet geanalyseerd"}
+                </span>
+                {e.important && <span className="badge">Belangrijk</span>}
+              </p>
+              {e.snippet && <p>{e.snippet}</p>}
+              {connection && (
+                <a
+                  className="text-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  href={`https://mail.google.com/mail/u/?authuser=${encodeURIComponent(connection.email_address)}#all/${encodeURIComponent(e.gmail_id)}`}
+                >
+                  Open in Gmail
+                </a>
+              )}
             </article>
           ))
         ) : (

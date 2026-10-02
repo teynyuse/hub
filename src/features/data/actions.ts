@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
-import { title, id, date, parseCents, validationMessage, categories } from "@/lib/validation";
+import { title, id, date, parseCents, validationMessage } from "@/lib/validation";
 import type { ActionState } from "@/lib/types";
 function refresh() {
   revalidatePath("/", "layout");
@@ -116,23 +116,6 @@ export async function updateRecord(_: ActionState, f: FormData): Promise<ActionS
   }
   refresh();
   return {};
-}
-export async function updateEmail(_: ActionState, f: FormData): Promise<ActionState> {
-  const { db, user } = await requireUser();
-  let data, recordId;
-  try {
-    recordId = id.parse(f.get("id"));
-    data = {
-      category: z.enum(categories).parse(f.get("category")),
-      important: f.get("important") === "on",
-    };
-  } catch (e) {
-    return { error: validationMessage(e) };
-  }
-  const { error } = await db.from("emails").update(data).eq("id", recordId).eq("user_id", user.id);
-  if (error) return databaseError();
-  refresh();
-  return { success: "Mail bijgewerkt." };
 }
 export async function updateProfile(_: ActionState, f: FormData): Promise<ActionState> {
   const { db, user } = await requireUser();

@@ -39,7 +39,7 @@ describe("mail", () => {
     });
   });
   it("uses Gmail importance labels", () => {
-    expect(classifyMail("Iemand", "Hallo", ["IMPORTANT"]).important).toBe(true);
+    expect(classifyMail("Collega", "Teamoverleg morgen", ["IMPORTANT"]).important).toBe(true);
   });
 });
 describe("account secrets", () => {

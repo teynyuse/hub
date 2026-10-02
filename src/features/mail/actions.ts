@@ -5,9 +5,9 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "node:crypto";
 import { requireUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { googleConfig, googleToken, googleGet } from "./google";
+import { googleConfig, googleToken, googleGet, GMAIL_SCOPE, canReadMail } from "./google";
 import { decryptToken } from "./crypto";
-import { classifyMail } from "./classify";
+import { classifiedMessage, type GoogleMessage } from "./message";
 import { validationMessage } from "@/lib/validation";
 import type { ActionState } from "@/lib/types";
 export async function connectGmail() {
@@ -27,19 +27,13 @@ export async function connectGmail() {
     client_id: config.clientId,
     redirect_uri: config.callback,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/gmail.metadata",
+    scope: GMAIL_SCOPE,
     access_type: "offline",
     prompt: "consent select_account",
     state,
   }).toString();
   redirect(url.toString());
 }
-type GoogleMessage = {
-  id: string;
-  labelIds?: string[];
-  internalDate: string;
-  payload?: { headers?: { name: string; value: string }[] };
-};
 export async function syncGmail(): Promise<ActionState> {
   const { db, user } = await requireUser();
   try {
@@ -49,7 +43,12 @@ export async function syncGmail(): Promise<ActionState> {
       .select("*")
       .eq("user_id", user.id)
       .single();
-    if (error || !connection) return { error: "Koppel eerst je Gmail-account." };
+    if (error || !connection)
+      return { error: "Koppel eerst je Gmail-account en voer de mailmigratie uit." };
+    if (!canReadMail(connection.granted_scope))
+      return {
+        error: "Koppel Gmail opnieuw om automatische sortering op mailinhoud toe te staan.",
+      };
     if (
       connection.last_synced_at &&
       Date.now() - new Date(connection.last_synced_at).getTime() < 30000
@@ -59,44 +58,40 @@ export async function syncGmail(): Promise<ActionState> {
       grant_type: "refresh_token",
       refresh_token: decryptToken(connection.refresh_token_encrypted, user.id),
     });
-    const list = await googleGet<{ messages?: { id: string }[] }>(
-      "messages?maxResults=50&labelIds=INBOX",
-      tokens.access_token,
-    );
-    const messages: GoogleMessage[] = [];
-    const ids = list.messages ?? [];
-    // Bound parallel requests to five and only retrieve headers and labels.
+    const ids: { id: string }[] = [];
+    let pageToken: string | undefined;
+    do {
+      const query = new URLSearchParams({ maxResults: "100", labelIds: "INBOX" });
+      if (pageToken) query.set("pageToken", pageToken);
+      const list = await googleGet<{ messages?: { id: string }[]; nextPageToken?: string }>(
+        `messages?${query}`,
+        tokens.access_token,
+      );
+      ids.push(...(list.messages ?? []));
+      pageToken = list.nextPageToken;
+    } while (pageToken && ids.length < 200);
+    ids.splice(200);
+    const messages: ReturnType<typeof classifiedMessage>[] = [];
+    // Read bodies on the server; only a short plain-text preview is persisted.
     for (let i = 0; i < ids.length; i += 5) {
       messages.push(
         ...(await Promise.all(
           ids
             .slice(i, i + 5)
-            .map((m) =>
-              googleGet<GoogleMessage>(
-                `messages/${encodeURIComponent(m.id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,
-                tokens.access_token,
+            .map(async (m) =>
+              classifiedMessage(
+                await googleGet<GoogleMessage>(
+                  `messages/${encodeURIComponent(m.id)}?format=full`,
+                  tokens.access_token,
+                ),
               ),
             ),
         )),
       );
     }
     if (ids.length) {
-      const batch = messages.map((m) => {
-        const headers = m.payload?.headers ?? [];
-        const sender =
-          headers.find((h) => h.name.toLowerCase() === "from")?.value ?? "Onbekende afzender";
-        const subject =
-          headers.find((h) => h.name.toLowerCase() === "subject")?.value ?? "(Geen onderwerp)";
-        return {
-          gmail_id: m.id,
-          sender,
-          subject,
-          unread: m.labelIds?.includes("UNREAD") ?? false,
-          received_at: new Date(Number(m.internalDate)).toISOString(),
-          ...classifyMail(sender, subject, m.labelIds),
-        };
-      });
-      const { error: writeError } = await db.rpc("sync_gmail_headers", { items: batch });
+      const batch = messages;
+      const { error: writeError } = await db.rpc("sync_gmail_messages", { items: batch });
       if (writeError) throw new Error("Mails opslaan lukte niet. Probeer opnieuw.");
     }
     const { error: stampError } = await admin
@@ -106,7 +101,7 @@ export async function syncGmail(): Promise<ActionState> {
     if (stampError) throw new Error("Synchronisatie afronden lukte niet.");
     revalidatePath("/", "layout");
     return {
-      success: `${messages.length} mails gecontroleerd. Je eigen categorieën blijven behouden.`,
+      success: `${messages.length} mails automatisch ingedeeld. Facturen, school, werk en overheid staan bij Relevant.`,
     };
   } catch (e) {
     return { error: validationMessage(e) };

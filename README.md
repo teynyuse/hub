@@ -10,7 +10,7 @@ Dit is een werkende eerste versie met Next.js, TypeScript, Tailwind CSS, Supabas
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Account   | Registreren met naam, e-mail en wachtwoord, e-mail bevestigen, inloggen, uitloggen                                                                       |
 | Home      | Widgets toevoegen, verwijderen, verslepen en smal/breed maken; indeling bewaren per gebruiker                                                            |
-| Mail      | Eén Gmail-account per gebruiker koppelen, metadata synchroniseren, categorieën en belangrijk-markering aanpassen, filteren, openen in Gmail, ontkoppelen |
+| Mail      | Eén Gmail-account per gebruiker, automatisch sorteren op inhoud, standaard alleen relevante mails, openen in Gmail, ontkoppelen |
 | Money     | Handmatig inkomsten en uitgaven invoeren, maand kiezen, bedragen en grafiek bekijken, betalingen bijhouden                                               |
 | Calendar  | Eigen afspraken toevoegen, chronologisch bekijken en verwijderen                                                                                         |
 | Tasks     | Taken met optionele deadline toevoegen, afronden, heropenen en verwijderen                                                                               |
@@ -86,6 +86,19 @@ Maak een account met je eigen naam, bevestig je e-mail en log in. Heb je de Supa
 
 **Eén draaiende terminal volstaat voor de app.** Supabase draait extern, er is geen aparte Express-server. Laat deze terminal open; stoppen kan met `Ctrl+C`.
 
+## Update: automatisch mail sorteren
+
+Voer na de initiële migratie ook `supabase/migrations/202610030001_automatic_mail.sql` uit in Supabase SQL Editor. De update is opnieuw uitvoerbaar en houdt je overige gegevens en Gmail-verbinding intact.
+
+Voor bestaande installaties:
+
+1. Installeer de code-update en voer alleen de nieuwe migratie uit (niet opnieuw de initiële migratie).
+2. Google Cloud → Google Auth Platform → Data Access: voeg `https://www.googleapis.com/auth/gmail.readonly` toe.
+3. Push de code naar GitHub en wacht tot Vercel de productie-deployment afrondt. De bestaande environment variables en encryptiesleutel blijven staan.
+4. Open Mail → **Gmail opnieuw koppelen**, geef toestemming om mails te lezen en klik op **Synchroniseren**.
+
+De bestaande koppeling met alleen headers krijgt een duidelijke herkoppelmelding. Je hoeft niets handmatig te sorteren. Synchroniseren zelf blijft een knop; een achtergrondjob is geen onderdeel van deze update.
+
 ## 4. Gmail koppelen (optioneel, nadat de basis werkt)
 
 De overige modules werken zonder Gmail. Accountregistratie via Supabase en Gmail koppelen zijn twee afzonderlijke stappen. Je kunt een ander Gmail-adres koppelen dan het adres waarmee je inlogt.
@@ -96,7 +109,7 @@ De overige modules werken zonder Gmail. Accountregistratie via Supabase en Gmail
 4. Voeg deze scope toe bij Data Access:
 
 ```text
-https://www.googleapis.com/auth/gmail.metadata
+https://www.googleapis.com/auth/gmail.readonly
 ```
 
 5. Maak een **OAuth client ID → Web application**.
@@ -107,7 +120,7 @@ http://localhost:3000/api/gmail/callback
 ```
 
 7. Kopieer de client ID en client secret naar `.env.local`.
-8. Kopieer de server-only **service_role** key uit Supabase naar `SUPABASE_SERVICE_ROLE_KEY`. Deze sleutel is alleen nodig voor de afgeschermde Gmail-tokenopslag; zet hem nooit in frontendcode.
+8. Kopieer de server-only **Secret key** (`sb_secret_...`, of de oudere service_role key) uit Supabase naar `SUPABASE_SERVICE_ROLE_KEY`. Deze sleutel is alleen nodig voor de afgeschermde Gmail-tokenopslag; zet hem nooit in frontendcode.
 9. Genereer een encryptiesleutel in een tweede terminal:
 
 ```bash
@@ -132,17 +145,19 @@ TOKEN_ENCRYPTION_KEY=jouw-gegenereerde-sleutel
 
 ### Hoe de Gmail-versie werkt
 
-- Synchroniseren controleert maximaal de laatste **50 inboxmails**. Het is geen volledige import van je mailbox. Opgeslagen oudere mails blijven in de app; archiveren/verwijderen in Gmail wordt nog niet gespiegeld.
-- De app haalt alleen headers en labels op, geen mailbody of bijlagen. De Gmail-scope is `gmail.metadata`, niet `gmail.modify`.
-- Alleen afzender, onderwerp, datum, categorie, belangrijk-markering, ongelezen-status en Gmail-ID worden opgeslagen.
-- Eenvoudige regels gebruiken onderwerp, afzender en Gmail-labels. Dit is een eerste categorisatie, geen AI. Niet elke mail kan correct herkend worden. Categorie **Werk** of **Persoonlijk** kan je bijvoorbeeld handmatig kiezen.
-- Je eigen categorieën en belangrijk-markeringen blijven bij volgende synchronisaties behouden.
+- Synchroniseren leest maximaal de laatste **200 inboxmails**, verdeeld over twee Gmail-resultaatpagina's. Het is geen volledige import; archiveren/verwijderen in Gmail wordt nog niet gespiegeld.
+- De scope `gmail.readonly` staat toe de mailtekst te lezen. De app vraagt geen schrijf- of verzendrechten.
+- Multipart-mail wordt uitgepakt; gewone tekst krijgt voorrang, HTML wordt omgezet in tekst. Bijlagen worden niet gedownload of inhoudelijk gelezen. Afzender, onderwerp, labels, mailtekst (maximaal 24.000 tekens) en bijlagenamen dienen als signalen.
+- Facturen, School, Werk en Overheid worden automatisch ingedeeld en standaard getoond bij **Relevant**, ook op Home. Reclame, accountmeldingen en bestellingen (zoals Takeaway) blijven uit deze weergave.
+- **Alle mails** geeft toegang tot verborgen of niet-herkende mails. Onzekere berichten blijven **Overig**; regels kunnen fouten maken. Dit is lokale herkenning, geen externe AI-service of betaald model. Geen automatische handelingen op basis van mailinhoud.
+- Alleen metadata, de categorie en een tekstvoorbeeld van maximaal 240 tekens worden bewaard, niet de volledige mailtekst of bijlagen. HTML wordt nooit als HTML getoond.
+- Elke synchronisatie berekent de categorie en belangrijk-markering opnieuw. Handmatige categorieformulieren zijn verwijderd. Oude mails zonder inhoudsanalyse blijven buiten Relevant tot ze opnieuw zijn verwerkt.
 - Mails worden niet verstuurd, verwijderd, gelezen gemarkeerd of verplaatst in Gmail. Je opent de inhoud via **Open in Gmail**.
 - Google refresh tokens zijn versleuteld met AES-256-GCM, inclusief binding aan het gebruikers-ID. De token-tabel is voor normale gebruikers helemaal ontoegankelijk.
 - Bij ontkoppelen wordt Google-toegang ingetrokken en worden opgeslagen mailgegevens verwijderd. Bij koppelen van een ander Gmail-adres worden de mails van het vorige adres verwijderd.
 - In Google's testmodus kan je toestemming verlopen en moet je opnieuw koppelen. Een testapp is geen onbeperkt publieke Gmail-integratie.
 
-`gmail.metadata` is een restricted scope. Voor openbaar gebruik moet je de toepasselijke Google-verificatie en security assessment afhandelen, omdat deze app metadata op een server bewaart. De vereisten hangen af van je gebruik en eventuele uitzonderingen. Minder opslaan verandert de scope-classificatie niet. Zie [Gmail-scopes](https://developers.google.com/workspace/gmail/api/auth/scopes) en [Google OAuth voor webservers](https://developers.google.com/identity/protocols/oauth2/web-server).
+`gmail.readonly` is een restricted scope. Voor openbaar gebruik moet je de toepasselijke Google-verificatie en security assessment afhandelen, omdat deze app metadata op een server bewaart. De vereisten hangen af van je gebruik en eventuele uitzonderingen. Minder opslaan verandert de scope-classificatie niet. Zie [Gmail-scopes](https://developers.google.com/workspace/gmail/api/auth/scopes) en [Google OAuth voor webservers](https://developers.google.com/identity/protocols/oauth2/web-server).
 
 ## 5. Structuur
 

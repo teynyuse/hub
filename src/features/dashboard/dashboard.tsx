@@ -22,6 +22,7 @@ import { GripVertical, X } from "lucide-react";
 import type { Widget, WidgetType } from "@/lib/types";
 import type { DashboardData } from "@/features/data/queries";
 import { money, dateLabel } from "@/lib/format";
+import { isRelevantMail } from "@/features/mail/classify";
 import { defaultWidgets, widgetNames } from "./config";
 import { saveLayout } from "./actions";
 function SortableWidget({
@@ -74,7 +75,8 @@ function WidgetContent({ type, data }: { type: WidgetType; data: DashboardData }
   const { profile, transactions, payments, tasks, emails, pages, events, today } = data;
   const pending = payments.filter((p) => p.status === "pending");
   const openTasks = tasks.filter((t) => !t.done);
-  const important = emails.filter((e) => e.important && e.unread);
+  const relevant = emails.filter(isRelevantMail);
+  const important = relevant.filter((e) => e.important && e.unread);
   const future = events.filter((e) => e.starts_at > new Date().toISOString());
   const empty = <p className="muted">Er staat nog niets.</p>;
   if (type === "attention")
@@ -148,17 +150,19 @@ function WidgetContent({ type, data }: { type: WidgetType; data: DashboardData }
   if (type === "mail")
     return (
       <>
-        {important.length ? (
+        {relevant.length ? (
           <ul className="item-list">
-            {important.slice(0, 4).map((e) => (
+            {relevant.slice(0, 4).map((e) => (
               <li key={e.id}>
                 <Link href="/mail">{e.subject}</Link>
-                <span className="truncate">{e.sender}</span>
+                <span className="truncate">
+                  {e.category} · {e.sender}
+                </span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="muted">Geen belangrijke ongelezen mails.</p>
+          <p className="muted">Geen relevante mails.</p>
         )}
         <Link className="text-link" href="/mail">
           Open Mail

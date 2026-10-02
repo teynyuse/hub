@@ -1,4 +1,8 @@
 import "server-only";
+export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+export function canReadMail(scope: string | null | undefined) {
+  return scope?.split(/\s+/).includes(GMAIL_SCOPE) ?? false;
+}
 export function gmailConfigured() {
   return Boolean(
     process.env.GOOGLE_CLIENT_ID &&

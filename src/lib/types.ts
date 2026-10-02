@@ -44,6 +44,8 @@ export type FileRecord = {
 export type Email = {
   id: string;
   gmail_id: string;
+  snippet: string;
+  classification_version: number;
   sender: string;
   subject: string;
   category: string;

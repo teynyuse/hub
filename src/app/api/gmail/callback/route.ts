@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { requireUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import { googleConfig, googleGet, googleToken } from "@/features/mail/google";
+import { googleConfig, googleGet, googleToken, canReadMail } from "@/features/mail/google";
 import { encryptToken } from "@/features/mail/crypto";
 export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
@@ -22,6 +22,10 @@ export async function GET(request: NextRequest) {
       code,
       redirect_uri: googleConfig().callback,
     });
+    if (!canReadMail(tokens.scope)) {
+      target.searchParams.set("error", "scope");
+      return NextResponse.redirect(target);
+    }
     if (!tokens.refresh_token) throw new Error("Missing refresh token");
     const profile = await googleGet<{ emailAddress: string }>("profile", tokens.access_token);
     const admin = adminClient();
@@ -40,6 +44,7 @@ export async function GET(request: NextRequest) {
         email_address: profile.emailAddress,
         refresh_token_encrypted: encryptToken(tokens.refresh_token, user.id),
         last_synced_at: null,
+        granted_scope: tokens.scope!,
       },
       { onConflict: "user_id" },
     );

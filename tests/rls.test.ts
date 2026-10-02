@@ -24,6 +24,12 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/202610030001_automatic_mail.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   await db.query(
     'insert into auth.users(id,raw_user_meta_data) values ($1,\'{"display_name":"Alice"}\'),($2,\'{"display_name":"Bob"}\')',
     [a, b],
@@ -196,5 +202,56 @@ describe("two separate accounts", () => {
       db.query("select category,important,sender from public.emails"),
     );
     expect(other.rows).toEqual([{ category: "Overig", important: false, sender: "sender" }]);
+  });
+  it("automatically replaces old categories without crossing account boundaries", async () => {
+    const batch = [
+      {
+        gmail_id: "mail",
+        sender: "classified",
+        subject: "Document",
+        category: "Facturen",
+        important: false,
+        unread: true,
+        received_at: "2026-10-03T12:00:00Z",
+        snippet: "Te betalen €42",
+        classification_version: 1,
+        user_id: b,
+      },
+    ];
+    await asUser(a, () =>
+      db.query("select public.sync_gmail_messages($1::jsonb)", [JSON.stringify(batch)]),
+    );
+    const own = await asUser(a, () =>
+      db.query("select category,important,snippet,classification_version from public.emails"),
+    );
+    expect(own.rows).toEqual([
+      {
+        category: "Facturen",
+        important: false,
+        snippet: "Te betalen €42",
+        classification_version: 1,
+      },
+    ]);
+    const other = await asUser(b, () =>
+      db.query("select category,snippet,classification_version from public.emails"),
+    );
+    expect(other.rows).toEqual([{ category: "Overig", snippet: "", classification_version: 0 }]);
+  });
+  it("rejects oversized and invalid sync batches", async () => {
+    for (const batch of [null, {}, Array(201).fill({})]) {
+      await expect(
+        asUser(a, () =>
+          db.query("select public.sync_gmail_messages($1::jsonb)", [JSON.stringify(batch)]),
+        ),
+      ).rejects.toThrow();
+    }
+  });
+  it("keeps the new mail RPC inaccessible to anonymous clients", async () => {
+    await db.exec("set role anon");
+    try {
+      await expect(db.query("select public.sync_gmail_messages('[]'::jsonb)")).rejects.toThrow();
+    } finally {
+      await db.exec("reset role");
+    }
   });
 });
