@@ -31,4 +31,55 @@ describe("factuurgegevens herkennen", () => {
     expect(invoice.amount_cents).toBeNull();
     expect(invoice.needs_review).toBe(true);
   });
+
+  it("herkent een geplande Alma-afbetaling met een geschreven maand", () => {
+    expect(
+      extractInvoice(
+        "Alma <payment@getalma.eu>",
+        "Uw volgende betaling is binnenkort verschuldigd",
+        "Wij zullen 599,66 € voor uw aankoop bij Krëfel NV op 7 oktober 2026 afschrijven.",
+        "2026-10-03T10:00:00Z",
+      ),
+    ).toMatchObject({
+      supplier: "Krëfel NV",
+      cost_category: "Afbetaling",
+      amount_cents: 59966,
+      due_date: "2026-10-07",
+      needs_review: false,
+    });
+  });
+
+  it("herkent een automatische Proximus-afschrijving", () => {
+    expect(
+      extractInvoice(
+        "Proximus <billing@proximus.be>",
+        "Je aanrekening is nu beschikbaar",
+        "Totaalbedrag €29,99 gaat automatisch van je rekening op 17/08/2026.",
+        "2026-08-02T10:00:00Z",
+      ),
+    ).toMatchObject({
+      supplier: "Proximus",
+      cost_category: "Telecom",
+      amount_cents: 2999,
+      due_date: "2026-08-17",
+      needs_review: false,
+    });
+  });
+
+  it("bewaart een ACV-bijdrage zonder een verzonnen betaaldatum", () => {
+    expect(
+      extractInvoice(
+        "ACV administratie <ACV-Administratie@news.acv-csc.be>",
+        "Betaling van je ACV-bijdrage",
+        "Totaal bedrag: 63,99 EUR. Periode van betaling: 01/10/2026 - 31/12/2026.",
+        "2026-09-28T10:00:00Z",
+      ),
+    ).toMatchObject({
+      supplier: "ACV",
+      cost_category: "Vakbond",
+      amount_cents: 6399,
+      due_date: null,
+      needs_review: true,
+    });
+  });
 });

@@ -52,6 +52,7 @@ export function classifyMail(
     /@(?:[a-z0-9-]+\.)*(?:hetacv\.be|acv-online\.be|cm\.be|lm\.be|mega\.be|orange\.be|kbc\.be|belfius\.be)\b/.test(
       from,
     );
+  const paymentProvider = /\b(alma|getalma|klarna|riverty)\b/.test(from);
   // An unknown sender can still qualify from a clear household expense in the text.
   // Do not treat a generic webshop invoice as a household bill.
   const householdExpense =
@@ -75,7 +76,12 @@ export function classifyMail(
     /\b(factuur|invoice)(?:[\s_.-]|\d|$)/.test(normalize(name)),
   );
   const paymentRequest =
-    /\b(te betalen|verschuldigd|gelieve te betalen|gelieve.*(?:storten|overschrijven)|betaal (?:je|uw|voor)|betaling.*(?:vervaldatum|uiterlijk)|premie.*(?:vervaldatum|domiciliering)|amount due|payment due|please pay)\b/.test(
+    /\b(te betalen|verschuldigd|gelieve te betalen|gelieve.*(?:storten|overschrijven)|betaal (?:je|uw|voor)|betaling.*(?:vervaldatum|uiterlijk|verschuldigd|plaatsvinden)|(?:afschrijven|afgeschreven|automatisch van (?:je|uw) rekening)|premie.*(?:vervaldatum|domiciliering)|amount due|payment due|please pay)\b/.test(
+      text,
+    );
+  const scheduledPayment =
+    paymentProvider &&
+    /\b(volgende betaling|betaling.*(?:verschuldigd|plaatsvinden)|afschrijven|afgeschreven|automatisch)\b/.test(
       text,
     );
   const householdBill =
@@ -85,8 +91,10 @@ export function classifyMail(
   // Account alerts and food orders stay out of the relevant inbox, even when starred.
   if (labels.includes("SPAM") || labels.includes("TRASH")) category = "Nieuwsbrieven";
   else if (accountNotice) category = "Accountmeldingen";
-  else if (foodDelivery || shopSender) category = "Bestellingen";
+  else if (foodDelivery) category = "Bestellingen";
   else if (marketingSubject) category = "Nieuwsbrieven";
+  else if (scheduledPayment) category = "Facturen";
+  else if (shopSender) category = "Bestellingen";
   else if (householdBill) category = "Facturen";
   else if (
     labels.includes("CATEGORY_PROMOTIONS") ||

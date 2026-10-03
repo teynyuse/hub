@@ -8,6 +8,7 @@ export const costCategories = [
   "Vakbond",
   "Ziekenfonds",
   "Wonen",
+  "Afbetaling",
   "Overig",
 ] as const;
 function normalized(text: string) {
@@ -28,6 +29,8 @@ const providers: [RegExp, string, string][] = [
   [/\babvv\b/i, "ABVV", "Vakbond"],
   [/\b(ethias|dvv|axa|allianz|ag insurance)\b/i, "", "Verzekering"],
   [/\b(helan|solidaris|partenamut)\b/i, "", "Ziekenfonds"],
+  [/\b(alma|getalma)\b/i, "Alma", "Afbetaling"],
+  [/\b(klarna|riverty)\b/i, "", "Afbetaling"],
 ];
 export function providerKey(value: string) {
   const text = normalized(value);
@@ -66,7 +69,10 @@ export function extractInvoice(sender: string, subject: string, body: string, re
   const text = normalized(raw);
   const matches = [
     ...raw.matchAll(
-      /(?:te betalen(?: bedrag)?|totaal(?: te betalen| inclusief btw)?|verschuldigd(?: bedrag)?|amount due|total due|montant a payer)\s*[:=]?\s*(?:€|EUR)?\s*([0-9][0-9 .]*(?:,[0-9]{1,2})?)\s*(?:€|EUR)?/gi,
+      /(?:te betalen(?: bedrag)?|totaal(?:bedrag| te betalen| inclusief btw)?|verschuldigd(?: bedrag)?|amount due|total due|montant a payer)\s*[:=]?\s*(?:€|EUR)?\s*([0-9][0-9 .]*(?:,[0-9]{1,2})?)\s*(?:€|EUR)?/gi,
+    ),
+    ...raw.matchAll(
+      /(?:wij zullen|we will)\s*(?:€|EUR)?\s*([0-9][0-9 .]*(?:,[0-9]{1,2})?)\s*(?:€|EUR)?/gi,
     ),
   ]
     .map((m) => currencyCents(m[1]))
@@ -74,7 +80,7 @@ export function extractInvoice(sender: string, subject: string, body: string, re
   const explicit = [...new Set(matches)];
   const currencies = [
     ...raw.matchAll(
-      /(?:€|EUR)\s*(-?\d[\d .]*(?:,\d{1,2})?)|(-?\d[\d .]*(?:,\d{1,2})?)\s*(?:€|EUR)\b/gi,
+      /(?:€|EUR)\s*(-?\d[\d .]*(?:,\d{1,2})?)|(-?\d[\d .]*(?:,\d{1,2})?)\s*(?:€|EUR)/gi,
     ),
   ]
     .map((m) => currencyCents(m[1] ?? m[2]))
@@ -93,7 +99,34 @@ export function extractInvoice(sender: string, subject: string, body: string, re
   ]
     .map((m) => validDate(m[1], m[2], m[3]))
     .filter((s): s is string => s !== null);
-  const dates = [...new Set(dateMatches)];
+  const debitDates = [
+    ...text.matchAll(
+      /(?:afschrijven|afgeschreven|automatisch van (?:je|uw) rekening(?: halen)?|gaat automatisch van (?:je|uw) rekening)(?:[^\d]{0,35})(\d{1,2})[\/.\-](\d{1,2})[\/.\-](20\d{2})/g,
+    ),
+  ]
+    .map((m) => validDate(m[1], m[2], m[3]))
+    .filter((s): s is string => s !== null);
+  const monthNames: Record<string, string> = {
+    januari: "01",
+    februari: "02",
+    maart: "03",
+    april: "04",
+    mei: "05",
+    juni: "06",
+    juli: "07",
+    augustus: "08",
+    september: "09",
+    oktober: "10",
+    november: "11",
+    december: "12",
+  };
+  for (const match of text.matchAll(
+    /(?:op|tegen|uiterlijk)\s+(\d{1,2})\s+(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)\s+(20\d{2})/g,
+  )) {
+    const parsed = validDate(match[1], monthNames[match[2]], match[3]);
+    if (parsed) debitDates.push(parsed);
+  }
+  const dates = [...new Set([...dateMatches, ...debitDates])];
   const due = dates.length === 1 ? dates[0] : null;
   const reference =
     /(?:factuurnummer|factuur(?:\s*(?:nr\.?|nummer|#))|invoice (?:number|no\.?))\s*[:#]?\s*([a-z0-9][a-z0-9\/-]{2,59})/i.exec(
@@ -116,6 +149,11 @@ export function extractInvoice(sender: string, subject: string, body: string, re
       break;
     }
   }
+  const purchaseSupplier =
+    /(?:aankoop|bestelling) bij\s+([\p{L}0-9][\p{L}0-9 .&'’_-]{1,60}?)(?:\s+op\s+\d|\s+zal|[,.])/iu
+      .exec(raw)?.[1]
+      ?.trim();
+  if (purchaseSupplier) supplier = purchaseSupplier;
   if (/\belektriciteit|electricity/.test(text) && !/\bgas(?:verbruik|factuur)?\b/.test(text))
     category = "Elektriciteit";
   else if (/\bgas(?:verbruik|factuur)?\b/.test(text) && !/elektriciteit|electricity/.test(text))
@@ -125,6 +163,8 @@ export function extractInvoice(sender: string, subject: string, body: string, re
   else if (/waterfactuur|waterverbruik/.test(text)) category = "Water";
   else if (/internetabonnement|telecom/.test(text)) category = "Telecom";
   else if (/huur|hypotheek|syndicus|\bvme\b/.test(text)) category = "Wonen";
+  else if (/volgende betaling|aankoop.*afschrijven|betaling.*plaatsvinden/.test(text))
+    category = "Afbetaling";
   return {
     title: `${category} · ${supplier}`.slice(0, 200),
     supplier,

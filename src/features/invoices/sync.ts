@@ -49,7 +49,7 @@ export async function discoverInvoiceMessages(token: string, historyId: string |
   const profile = await googleGet<{ historyId: string }>("profile", token);
   const query = new URLSearchParams({
     maxResults: "100",
-    q: 'newer_than:2y {factuur invoice rekening afrekening "te betalen" "amount due" verzekering premie lidgeld} -category:promotions -category:social',
+    q: 'newer_than:2y {factuur invoice rekening aanrekening afrekening "te betalen" "amount due" "volgende betaling" "automatisch van je rekening" bijdrage verzekering premie lidgeld} -category:promotions -category:social',
   });
   const list = await googleGet<{ messages?: { id: string }[] }>(`messages?${query}`, token);
   return { ids: (list.messages ?? []).map((m) => m.id), checkpoint: profile.historyId };
