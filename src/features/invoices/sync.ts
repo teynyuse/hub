@@ -47,10 +47,11 @@ export async function discoverInvoiceMessages(token: string, historyId: string |
   }
   // Take a checkpoint before listing so new mail arriving during the import is not lost.
   const profile = await googleGet<{ historyId: string }>("profile", token);
-  const list = await googleGet<{ messages?: { id: string }[] }>(
-    "messages?maxResults=100&labelIds=INBOX",
-    token,
-  );
+  const query = new URLSearchParams({
+    maxResults: "100",
+    q: 'newer_than:2y {factuur invoice rekening afrekening "te betalen" "amount due" verzekering premie lidgeld} -category:promotions -category:social',
+  });
+  const list = await googleGet<{ messages?: { id: string }[] }>(`messages?${query}`, token);
   return { ids: (list.messages ?? []).map((m) => m.id), checkpoint: profile.historyId };
 }
 export async function runInvoiceSync(userId: string) {

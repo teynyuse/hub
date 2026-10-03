@@ -14,16 +14,17 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("slimme Gmail-controle", () => {
   it("neemt bij de eerste controle hoogstens 100 inboxmails", async () => {
-    mocks.get
-      .mockResolvedValueOnce({ historyId: "checkpoint-1" })
-      .mockResolvedValueOnce({
-        messages: Array.from({ length: 100 }, (_, i) => ({ id: `mail-${i}` })),
-      });
+    mocks.get.mockResolvedValueOnce({ historyId: "checkpoint-1" }).mockResolvedValueOnce({
+      messages: Array.from({ length: 100 }, (_, i) => ({ id: `mail-${i}` })),
+    });
     const result = await discoverInvoiceMessages("token", null);
     expect(result.ids).toHaveLength(100);
     expect(result.checkpoint).toBe("checkpoint-1");
     expect(mocks.get).toHaveBeenNthCalledWith(1, "profile", "token");
-    expect(mocks.get).toHaveBeenNthCalledWith(2, "messages?maxResults=100&labelIds=INBOX", "token");
+    const firstSearch = mocks.get.mock.calls[1][0] as string;
+    expect(firstSearch).toContain("messages?maxResults=100");
+    expect(firstSearch).toContain("q=");
+    expect(decodeURIComponent(firstSearch)).toContain("newer_than:2y");
   });
 
   it("vraagt daarna alleen nieuwe inboxmails op via de Gmail-geschiedenis", async () => {

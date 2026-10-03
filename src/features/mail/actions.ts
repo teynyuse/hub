@@ -40,6 +40,26 @@ export async function syncGmail(): Promise<ActionState> {
   revalidatePath("/", "layout");
   return result;
 }
+export async function rescanInvoices(): Promise<ActionState> {
+  const { user } = await requireUser();
+  const admin = adminClient();
+  const { error } = await admin
+    .from("gmail_connections")
+    .update({
+      sync_history_id: null,
+      pending_history_id: null,
+      sync_queue: [],
+      next_sync_at: new Date().toISOString(),
+      sync_lock_id: null,
+      sync_lock_until: null,
+      last_sync_error: null,
+    })
+    .eq("user_id", user.id);
+  if (error) return { error: "Opnieuw zoeken starten lukte niet." };
+  const result = await runInvoiceSync(user.id);
+  revalidatePath("/", "layout");
+  return result;
+}
 export async function disconnectGmail(): Promise<ActionState> {
   const { db, user } = await requireUser();
   try {

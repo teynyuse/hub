@@ -3,7 +3,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { getProfile } from "@/features/data/queries";
 import { getInvoiceOverview } from "@/features/invoices/queries";
 import { gmailConfigured, canReadMail } from "@/features/mail/google";
-import { connectGmail, disconnectGmail, syncGmail } from "@/features/mail/actions";
+import { connectGmail, disconnectGmail, rescanInvoices, syncGmail } from "@/features/mail/actions";
 import {
   addInvoice,
   editInvoice,
@@ -238,7 +238,10 @@ export default async function Invoices({
                 )}
                 <InvoiceAutoSync enabled={readable} nextSyncAt={connection.next_sync_at} />
                 {readable ? (
-                  <ActionForm action={syncGmail} submit="Controleer indien nodig" />
+                  <>
+                    <ActionForm action={syncGmail} submit="Controleer indien nodig" />
+                    <ActionForm action={rescanInvoices} submit="Facturen opnieuw zoeken" />
+                  </>
                 ) : (
                   <form action={connectGmail}>
                     <button>Gmail opnieuw koppelen</button>
