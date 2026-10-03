@@ -11,6 +11,7 @@ import {
   setRecurringActive,
 } from "@/features/invoices/actions";
 import { PaidCheckbox } from "@/features/invoices/paid-checkbox";
+import { DismissInvoiceButton } from "@/features/invoices/dismiss-button";
 import { InvoiceFields } from "@/features/invoices/fields";
 import { InvoiceAutoSync } from "@/features/invoices/auto-sync";
 import { ActionForm } from "@/components/action-form";
@@ -35,7 +36,17 @@ export default async function Invoices({
       ? requested
       : today.slice(0, 7);
   const { invoices, costs } = await getInvoiceOverview(month);
-  const open = invoices.filter((i) => i.status === "pending" && i.billing_month <= month + "-01");
+  const paymentOrder = (a: Invoice, b: Invoice) => {
+    if (!a.due_date) return b.due_date ? 1 : 0;
+    if (!b.due_date) return -1;
+    const aFuture = a.due_date >= today;
+    const bFuture = b.due_date >= today;
+    if (aFuture !== bFuture) return aFuture ? -1 : 1;
+    return aFuture ? a.due_date.localeCompare(b.due_date) : b.due_date.localeCompare(a.due_date);
+  };
+  const open = invoices
+    .filter((i) => i.status === "pending" && i.billing_month <= month + "-01")
+    .sort(paymentOrder);
   const paid = invoices.filter((i) => i.status === "paid" && i.billing_month === month + "-01");
   const total = (rows: Invoice[]) => rows.reduce((sum, i) => sum + (i.amount_cents ?? 0), 0);
   let connection: {
@@ -97,6 +108,7 @@ export default async function Invoices({
                       <InvoiceFields value={i} month={month} />
                     </ActionForm>
                   </details>
+                  {i.gmail_id && <DismissInvoiceButton id={i.id} title={i.title} />}
                   {i.gmail_id && connection && (
                     <a
                       className="text-link"

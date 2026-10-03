@@ -94,7 +94,7 @@ export function extractInvoice(sender: string, subject: string, body: string, re
         : null;
   const dateMatches = [
     ...text.matchAll(
-      /(?:vervaldatum|betaal(?:baar)? (?:voor|uiterlijk)|te betalen (?:voor|tegen)|uiterlijk|due date|pay by|echeance)\s*:?\s*(\d{1,2})[\/.\-](\d{1,2})[\/.\-](20\d{2})/g,
+      /(?:vervaldatum|betaaldatum|betaal(?:baar)? (?:voor|uiterlijk)|te betalen (?:voor|tegen)|uiterlijk|afschrij(?:ven|ving)(?: op)?|due date|pay by|echeance)\s*:?\s*(\d{1,2})[\/.\-](\d{1,2})[\/.\-](20\d{2})/g,
     ),
   ]
     .map((m) => validDate(m[1], m[2], m[3]))
@@ -121,7 +121,7 @@ export function extractInvoice(sender: string, subject: string, body: string, re
     december: "12",
   };
   for (const match of text.matchAll(
-    /(?:op|tegen|uiterlijk)\s+(\d{1,2})\s+(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)\s+(20\d{2})/g,
+    /(?:op|tegen|uiterlijk|te betalen voor|te betalen tegen|vervaldatum|betaaldatum|afschrijven op)\s+(\d{1,2})\s+(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)\s+(20\d{2})/g,
   )) {
     const parsed = validDate(match[1], monthNames[match[2]], match[3]);
     if (parsed) debitDates.push(parsed);

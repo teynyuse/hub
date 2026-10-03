@@ -10,5 +10,5 @@ export async function getInvoiceOverview(month: string) {
     getRows<Invoice>("invoices", "billing_month", true),
     getRows<RecurringCost>("recurring_costs", "created_at"),
   ]);
-  return { invoices, costs };
+  return { invoices: invoices.filter((invoice) => !invoice.dismissed_at), costs };
 }

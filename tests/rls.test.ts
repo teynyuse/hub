@@ -71,6 +71,12 @@ beforeAll(async () => {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/202610030003_dismiss_invoices.sql", import.meta.url),
+      "utf8",
+    ),
+  );
   for (const user of [a, b]) {
     await db.query(
       "insert into public.recurring_costs(user_id,title,amount_cents,day_of_month,start_month) values ($1,'energy',5000,15,'2026-10-01')",

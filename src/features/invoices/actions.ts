@@ -27,18 +27,16 @@ export async function addInvoice(_: ActionState, f: FormData): Promise<ActionSta
   const { db, user } = await requireUser();
   try {
     const due = date.parse(f.get("due_date"));
-    const { error } = await db
-      .from("invoices")
-      .insert({
-        ...fields(f),
-        user_id: user.id,
-        amount_cents: parseCents(f.get("amount")),
-        due_date: due,
-        billing_month: due.slice(0, 7) + "-01",
-        source: "manual",
-        source_key: crypto.randomUUID(),
-        reviewed_at: new Date().toISOString(),
-      });
+    const { error } = await db.from("invoices").insert({
+      ...fields(f),
+      user_id: user.id,
+      amount_cents: parseCents(f.get("amount")),
+      due_date: due,
+      billing_month: due.slice(0, 7) + "-01",
+      source: "manual",
+      source_key: crypto.randomUUID(),
+      reviewed_at: new Date().toISOString(),
+    });
     if (error) throw new Error("Factuur opslaan lukte niet. Controleer de facturenmigratie.");
     refresh();
     return { success: "Factuur toegevoegd." };
@@ -82,6 +80,22 @@ export async function setInvoicePaid(_: ActionState, f: FormData): Promise<Actio
       .eq("id", id.parse(f.get("id")))
       .eq("user_id", user.id);
     if (error) throw new Error("Betaalstatus opslaan lukte niet.");
+    refresh();
+    return {};
+  } catch (e) {
+    return { error: validationMessage(e) };
+  }
+}
+export async function dismissInvoice(_: ActionState, f: FormData): Promise<ActionState> {
+  const { db, user } = await requireUser();
+  try {
+    const { error } = await db
+      .from("invoices")
+      .update({ dismissed_at: new Date().toISOString() })
+      .eq("id", id.parse(f.get("id")))
+      .eq("user_id", user.id)
+      .not("gmail_id", "is", null);
+    if (error) throw new Error("Betaling verwijderen lukte niet.");
     refresh();
     return {};
   } catch (e) {

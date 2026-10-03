@@ -42,6 +42,7 @@ export type Invoice = {
   invoice_number: string | null;
   needs_review: boolean;
   recurring_cost_id: string | null;
+  dismissed_at: string | null;
 };
 export type RecurringCost = {
   id: string;

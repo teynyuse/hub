@@ -70,7 +70,8 @@ export async function dashboardData() {
     getRows<Email>("emails", "received_at"),
     getRows<CalendarEvent>("calendar_events", "starts_at", true),
   ]);
-  const payments: Payment[] = invoices
+  const visibleInvoices = invoices.filter((i) => !i.dismissed_at);
+  const payments: Payment[] = visibleInvoices
     .filter((i) => i.amount_cents !== null && i.due_date !== null)
     .map((i) => ({
       id: i.id,
@@ -79,7 +80,17 @@ export async function dashboardData() {
       due_date: i.due_date!,
       status: i.status,
     }));
-  return { profile, today, transactions, payments, invoices, tasks, pages, emails, events };
+  return {
+    profile,
+    today,
+    transactions,
+    payments,
+    invoices: visibleInvoices,
+    tasks,
+    pages,
+    emails,
+    events,
+  };
 }
 export type DashboardData = Awaited<ReturnType<typeof dashboardData>>;
 export type { FileRecord };

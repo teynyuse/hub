@@ -82,4 +82,15 @@ describe("factuurgegevens herkennen", () => {
       needs_review: true,
     });
   });
+
+  it("leest een uitgeschreven vervaldatum na 'te betalen voor'", () => {
+    expect(
+      extractInvoice(
+        "Luminus <factuur@luminus.be>",
+        "Je voorschot voor elektriciteit",
+        "Totaal te betalen: €125,00. Te betalen voor 12 oktober 2026.",
+        "2026-10-03T10:00:00Z",
+      ).due_date,
+    ).toBe("2026-10-12");
+  });
 });
