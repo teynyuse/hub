@@ -26,6 +26,34 @@ export type Payment = {
   due_date: string;
   status: "pending" | "paid";
 };
+export type Invoice = {
+  id: string;
+  title: string;
+  supplier: string;
+  provider_key: string;
+  cost_category: string;
+  amount_cents: number | null;
+  due_date: string | null;
+  billing_month: string;
+  status: "pending" | "paid";
+  paid_at: string | null;
+  source: "gmail" | "manual" | "recurring";
+  gmail_id: string | null;
+  invoice_number: string | null;
+  needs_review: boolean;
+  recurring_cost_id: string | null;
+};
+export type RecurringCost = {
+  id: string;
+  title: string;
+  supplier: string;
+  provider_key: string;
+  cost_category: string;
+  amount_cents: number;
+  day_of_month: number;
+  start_month: string;
+  active: boolean;
+};
 export type Task = { id: string; title: string; due_date: string | null; done: boolean };
 export type CalendarEvent = {
   id: string;

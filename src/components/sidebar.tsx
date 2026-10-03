@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 const items = [
   { href: "/home", label: "Home", icon: Home },
-  { href: "/mail", label: "Mail", icon: Mail },
+  { href: "/mail", label: "Facturen", icon: Mail },
   { href: "/money", label: "Money", icon: Wallet },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/tasks", label: "Tasks", icon: ListTodo },

@@ -1,10 +1,11 @@
-import { getProfile, getRows, getTransactions } from "@/features/data/queries";
+import { getProfile, getTransactions } from "@/features/data/queries";
 import { ActionForm } from "@/components/action-form";
 import { RecordActions } from "@/components/record-actions";
 import { addTransaction, addPayment } from "@/features/data/actions";
 import { ExpenseChart } from "@/features/money/chart";
 import { localDate, money, dateLabel } from "@/lib/format";
-import type { Payment } from "@/lib/types";
+import { getInvoiceOverview } from "@/features/invoices/queries";
+import { PaidCheckbox } from "@/features/invoices/paid-checkbox";
 export default async function Money({
   searchParams,
 }: {
@@ -17,7 +18,9 @@ export default async function Money({
     params.month && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.month) ? params.month : today.slice(0, 7);
   const [transactions, payments] = await Promise.all([
     getTransactions(month),
-    getRows<Payment>("payments", "due_date", true),
+    getInvoiceOverview(month).then((result) =>
+      result.invoices.filter((i) => i.billing_month === month + "-01"),
+    ),
   ]);
   const income = transactions
     .filter((t) => t.kind === "income")
@@ -113,18 +116,19 @@ export default async function Money({
                   <li key={p.id}>
                     <div>
                       <p>
-                        {p.title} · {money(p.amount_cents, profile.currency)}
+                        {p.title} ·{" "}
+                        {p.amount_cents === null ? "Bedrag nakijken" : money(p.amount_cents, "EUR")}
                       </p>
                       <span>
-                        {dateLabel(p.due_date, profile.timezone)} ·{" "}
-                        {p.status === "paid" ? "Betaald" : p.due_date < today ? "Te laat" : "Open"}
+                        {p.due_date ? dateLabel(p.due_date, profile.timezone) : "Datum nakijken"} ·{" "}
+                        {p.status === "paid"
+                          ? "Betaald"
+                          : p.due_date && p.due_date < today
+                            ? "Te laat"
+                            : "Open"}
                       </span>
                     </div>
-                    <RecordActions
-                      id={p.id}
-                      table="payments"
-                      toggle={p.status === "paid" ? "Heropenen" : "Betaald"}
-                    />
+                    <PaidCheckbox id={p.id} paid={p.status === "paid"} title={p.title} />
                   </li>
                 ))}
               </ul>

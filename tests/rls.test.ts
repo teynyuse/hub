@@ -65,6 +65,18 @@ beforeAll(async () => {
       `${user}/file`,
     ]);
   }
+  await db.exec(
+    await readFile(
+      new URL("../supabase/migrations/202610030002_invoice_overview.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  for (const user of [a, b]) {
+    await db.query(
+      "insert into public.recurring_costs(user_id,title,amount_cents,day_of_month,start_month) values ($1,'energy',5000,15,'2026-10-01')",
+      [user],
+    );
+  }
 });
 afterAll(async () => {
   await db.close();
@@ -88,6 +100,8 @@ describe("two separate accounts", () => {
     "pages",
     "files",
     "emails",
+    "invoices",
+    "recurring_costs",
   ])("only reads own %s", async (table) => {
     const key = table === "profiles" ? "id" : "user_id";
     const result = await asUser(a, () =>

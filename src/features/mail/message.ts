@@ -3,7 +3,7 @@ export type MessagePart = {
   mimeType?: string;
   filename?: string;
   headers?: { name: string; value: string }[];
-  body?: { data?: string; attachmentId?: string };
+  body?: { data?: string; attachmentId?: string; size?: number };
   parts?: MessagePart[];
 };
 export type GoogleMessage = {

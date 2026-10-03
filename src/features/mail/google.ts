@@ -41,11 +41,15 @@ export async function googleToken(params: Record<string, string>): Promise<Token
   return response.json();
 }
 export async function googleGet<T>(path: string, token: string): Promise<T> {
-  const operation = path.startsWith("messages?")
-    ? "messages.list"
-    : path.startsWith("messages/")
-      ? "messages.get"
-      : "profile";
+  const operation = path.startsWith("history?")
+    ? "history.list"
+    : path.includes("/attachments/")
+      ? "messages.attachments.get"
+      : path.startsWith("messages?")
+        ? "messages.list"
+        : path.startsWith("messages/")
+          ? "messages.get"
+          : "profile";
   for (let attempt = 0; ; attempt++) {
     const response = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -89,7 +93,7 @@ const reasons = new Set([
 function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
-function gmailErrorReason(value: unknown): string {
+export function gmailErrorReason(value: unknown): string {
   const error = record(record(value).error);
   // The legacy metadata grant can block full-message reads even after adding readonly.
   if (typeof error.message === "string" && /metadata scope/i.test(error.message))

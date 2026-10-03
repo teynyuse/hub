@@ -4,6 +4,7 @@ import type {
   Profile,
   Transaction,
   Payment,
+  Invoice,
   Task,
   Page,
   FileRecord,
@@ -58,15 +59,27 @@ export async function dashboardData() {
   const profile = await getProfile();
   const today = localDate(profile.timezone);
   const month = today.slice(0, 7);
-  const [transactions, payments, tasks, pages, emails, events] = await Promise.all([
+  const { db } = await requireUser();
+  const generated = await db.rpc("ensure_recurring_invoices", { target_month: month + "-01" });
+  if (generated.error) throw new Error("Voer de facturenmigratie uit.");
+  const [transactions, invoices, tasks, pages, emails, events] = await Promise.all([
     getTransactions(month),
-    getRows<Payment>("payments", "due_date", true),
+    getRows<Invoice>("invoices", "billing_month", true),
     getRows<Task>("tasks", "created_at"),
     getRows<Page>("pages", "updated_at"),
     getRows<Email>("emails", "received_at"),
     getRows<CalendarEvent>("calendar_events", "starts_at", true),
   ]);
-  return { profile, today, transactions, payments, tasks, pages, emails, events };
+  const payments: Payment[] = invoices
+    .filter((i) => i.amount_cents !== null && i.due_date !== null)
+    .map((i) => ({
+      id: i.id,
+      title: i.title,
+      amount_cents: i.amount_cents!,
+      due_date: i.due_date!,
+      status: i.status,
+    }));
+  return { profile, today, transactions, payments, invoices, tasks, pages, emails, events };
 }
 export type DashboardData = Awaited<ReturnType<typeof dashboardData>>;
 export type { FileRecord };

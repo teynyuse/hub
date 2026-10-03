@@ -22,7 +22,6 @@ import { GripVertical, X } from "lucide-react";
 import type { Widget, WidgetType } from "@/lib/types";
 import type { DashboardData } from "@/features/data/queries";
 import { money, dateLabel } from "@/lib/format";
-import { isRelevantMail } from "@/features/mail/classify";
 import { defaultWidgets, widgetNames } from "./config";
 import { saveLayout } from "./actions";
 function SortableWidget({
@@ -72,20 +71,21 @@ function SortableWidget({
   );
 }
 function WidgetContent({ type, data }: { type: WidgetType; data: DashboardData }) {
-  const { profile, transactions, payments, tasks, emails, pages, events, today } = data;
+  const { profile, transactions, payments, invoices, tasks, pages, events, today } = data;
   const pending = payments.filter((p) => p.status === "pending");
   const openTasks = tasks.filter((t) => !t.done);
-  const relevant = emails.filter(isRelevantMail);
-  const important = relevant.filter((e) => e.important && e.unread);
+  const relevant = invoices.filter(
+    (i) => i.status === "pending" && i.billing_month <= today.slice(0, 7) + "-01",
+  );
   const future = events.filter((e) => e.starts_at > new Date().toISOString());
   const empty = <p className="muted">Er staat nog niets.</p>;
   if (type === "attention")
     return (
       <div className="attention-links">
         <Link href="/mail">
-          <strong>{important.length}</strong> belangrijke ongelezen mails
+          <strong>{relevant.filter((i) => i.needs_review).length}</strong> facturen te controleren
         </Link>
-        <Link href="/money">
+        <Link href="/mail">
           <strong>{pending.filter((p) => p.due_date <= today).length}</strong> betalingen vandaag of
           te laat
         </Link>
@@ -154,18 +154,19 @@ function WidgetContent({ type, data }: { type: WidgetType; data: DashboardData }
           <ul className="item-list">
             {relevant.slice(0, 4).map((e) => (
               <li key={e.id}>
-                <Link href="/mail">{e.subject}</Link>
+                <Link href="/mail">{e.title}</Link>
                 <span className="truncate">
-                  {e.category} · {e.sender}
+                  {e.amount_cents === null ? "Bedrag nakijken" : money(e.amount_cents, "EUR")} ·{" "}
+                  {e.supplier}
                 </span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="muted">Geen facturen voor vaste kosten.</p>
+          <p className="muted">Geen open facturen.</p>
         )}
         <Link className="text-link" href="/mail">
-          Open Mail
+          Open facturen
         </Link>
       </>
     );

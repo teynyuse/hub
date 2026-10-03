@@ -5,16 +5,9 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "node:crypto";
 import { requireUser } from "@/lib/auth";
 import { adminClient } from "@/lib/supabase/admin";
-import {
-  googleConfig,
-  googleToken,
-  googleGet,
-  GMAIL_SCOPE,
-  canReadMail,
-  GmailApiError,
-} from "./google";
+import { googleConfig, GMAIL_SCOPE } from "./google";
 import { decryptToken } from "./crypto";
-import { classifiedMessage, type GoogleMessage } from "./message";
+import { runInvoiceSync } from "@/features/invoices/sync";
 import { validationMessage } from "@/lib/validation";
 import type { ActionState } from "@/lib/types";
 export async function connectGmail() {
@@ -42,86 +35,10 @@ export async function connectGmail() {
   redirect(url.toString());
 }
 export async function syncGmail(): Promise<ActionState> {
-  const { db, user } = await requireUser();
-  try {
-    const admin = adminClient();
-    const { data: connection, error } = await admin
-      .from("gmail_connections")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
-    if (error || !connection)
-      return { error: "Koppel eerst je Gmail-account en voer de mailmigratie uit." };
-    if (!canReadMail(connection.granted_scope))
-      return {
-        error: "Koppel Gmail opnieuw om automatische sortering op mailinhoud toe te staan.",
-      };
-    if (
-      connection.last_synced_at &&
-      Date.now() - new Date(connection.last_synced_at).getTime() < 30000
-    )
-      return { error: "Wacht even tussen twee synchronisaties." };
-    const tokens = await googleToken({
-      grant_type: "refresh_token",
-      refresh_token: decryptToken(connection.refresh_token_encrypted, user.id),
-    });
-    const ids: { id: string }[] = [];
-    let pageToken: string | undefined;
-    do {
-      const query = new URLSearchParams({ maxResults: "100", labelIds: "INBOX" });
-      if (pageToken) query.set("pageToken", pageToken);
-      const list = await googleGet<{ messages?: { id: string }[]; nextPageToken?: string }>(
-        `messages?${query}`,
-        tokens.access_token,
-      );
-      ids.push(...(list.messages ?? []));
-      pageToken = list.nextPageToken;
-    } while (pageToken && ids.length < 200);
-    ids.splice(200);
-    const messages: ReturnType<typeof classifiedMessage>[] = [];
-    // Read bodies on the server; only a short plain-text preview is persisted.
-    // Pace full-message reads: at most two at once, with a second between batches.
-    // Gmail charges quota units per read, even when no message is changed.
-    for (let i = 0; i < ids.length; i += 2) {
-      if (i > 0) await new Promise((resolve) => setTimeout(resolve, 1000));
-      messages.push(
-        ...(
-          await Promise.all(
-            ids.slice(i, i + 2).map(async (m) => {
-              try {
-                return classifiedMessage(
-                  await googleGet<GoogleMessage>(
-                    `messages/${encodeURIComponent(m.id)}?format=full`,
-                    tokens.access_token,
-                  ),
-                );
-              } catch (error) {
-                // A mail may be deleted between listing and reading it.
-                if (error instanceof GmailApiError && error.status === 404) return null;
-                throw error;
-              }
-            }),
-          )
-        ).filter((message) => message !== null),
-      );
-    }
-    if (messages.length) {
-      const batch = messages;
-      const { error: writeError } = await db.rpc("sync_gmail_messages", { items: batch });
-      if (writeError) throw new Error("Mails opslaan lukte niet. Probeer opnieuw.");
-    }
-    const { error: stampError } = await admin
-      .from("gmail_connections")
-      .update({ last_synced_at: new Date().toISOString() })
-      .eq("user_id", user.id);
-    if (stampError) throw new Error("Synchronisatie afronden lukte niet.");
-    revalidatePath("/", "layout");
-    return {
-      success: `${messages.length} mails gecontroleerd. Alleen facturen en betalingsverzoeken voor vaste kosten worden getoond.`,
-    };
-  } catch (e) {
-    return { error: validationMessage(e) };
-  }
+  const { user } = await requireUser();
+  const result = await runInvoiceSync(user.id);
+  revalidatePath("/", "layout");
+  return result;
 }
 export async function disconnectGmail(): Promise<ActionState> {
   const { db, user } = await requireUser();

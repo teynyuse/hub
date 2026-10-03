@@ -43,7 +43,15 @@ export async function addPayment(_: ActionState, f: FormData): Promise<ActionSta
   } catch (e) {
     return { error: validationMessage(e) };
   }
-  const { error } = await db.from("payments").insert({ ...data, user_id: user.id });
+  const { error } = await db
+    .from("invoices")
+    .insert({
+      ...data,
+      user_id: user.id,
+      source: "manual",
+      source_key: crypto.randomUUID(),
+      billing_month: data.due_date.slice(0, 7) + "-01",
+    });
   if (error) return databaseError();
   refresh();
   return { success: "Betaling toegevoegd." };
