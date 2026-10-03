@@ -118,6 +118,11 @@ ul {
   color: var(--muted);
   font-size: 0.875rem;
 }
+.field-help {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
 .error {
   color: #b42318;
   font-size: 0.875rem;
@@ -297,6 +302,83 @@ ul {
   margin: 5px 0 0;
   font-variant-numeric: tabular-nums;
 }
+.invoice-summary {
+  background: var(--surface);
+}
+.invoice-list {
+  border-top: 1px solid var(--border);
+}
+.invoice-row {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.8fr) minmax(95px, 0.7fr) minmax(95px, 0.7fr) minmax(
+      105px,
+      0.8fr
+    ) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.invoice-main,
+.invoice-value,
+.invoice-state {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.invoice-main strong,
+.invoice-main span {
+  overflow-wrap: anywhere;
+}
+.invoice-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.invoice-badges,
+.invoice-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.invoice-actions {
+  justify-content: flex-end;
+}
+.invoice-edit {
+  position: relative;
+}
+.invoice-edit summary,
+.invoice-tools summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.invoice-edit-form {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  top: calc(100% + 8px);
+  width: min(320px, 80vw);
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: white;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 10%);
+}
+.dismiss-form {
+  display: inline-flex;
+}
+.dismiss-button {
+  color: var(--muted);
+}
+.invoice-tools > details {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.tool-form {
+  margin-top: 16px;
+}
 .attention-links {
   display: flex;
   gap: 24px;
@@ -341,6 +423,25 @@ td form button {
   font-size: 0.875rem;
   padding: 4px 8px;
   min-height: 32px;
+}
+@media (max-width: 1050px) {
+  .invoice-row {
+    grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(90px, auto));
+  }
+  .invoice-state,
+  .invoice-actions {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+}
+@media (max-width: 720px) {
+  .invoice-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .invoice-main,
+  .invoice-actions {
+    grid-column: 1 / -1;
+  }
 }
 .inline-form {
   display: flex;

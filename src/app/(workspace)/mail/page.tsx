@@ -69,61 +69,56 @@ export default async function Invoices({
   const readable = Boolean(connection && canReadMail(connection.granted_scope));
   const list = (rows: Invoice[]) =>
     rows.length ? (
-      <div className="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Kost</th>
-              <th>Te betalen</th>
-              <th>Voor</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((i) => (
-              <tr key={i.id}>
-                <td>
-                  <strong>{i.title}</strong>
-                  <div className="muted">
-                    {i.source === "recurring" && !i.gmail_id ? "Maandelijkse kost" : i.supplier}
-                    {i.invoice_number && ` · ${i.invoice_number}`}
-                  </div>
-                </td>
-                <td className="numeric">
-                  {i.amount_cents === null ? "Bedrag nakijken" : money(i.amount_cents, "EUR")}
-                </td>
-                <td>{i.due_date ? dateLabel(i.due_date, profile.timezone) : "Datum nakijken"}</td>
-                <td>
-                  <PaidCheckbox id={i.id} paid={i.status === "paid"} title={i.title} />
-                  {i.status === "pending" && i.due_date && i.due_date < today && (
-                    <span className="badge">Te laat</span>
-                  )}
-                  {i.needs_review && <span className="badge">Controleren</span>}
-                </td>
-                <td>
-                  <details>
-                    <summary>Aanpassen</summary>
-                    <ActionForm action={editInvoice} submit="Opslaan">
-                      <InvoiceFields value={i} month={month} />
-                    </ActionForm>
-                  </details>
-                  {i.gmail_id && <DismissInvoiceButton id={i.id} title={i.title} />}
-                  {i.gmail_id && connection && (
-                    <a
-                      className="text-link"
-                      href={`https://mail.google.com/mail/u/?authuser=${encodeURIComponent(connection.email_address)}#all/${encodeURIComponent(i.gmail_id)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Factuur in Gmail
-                    </a>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="invoice-list">
+        {rows.map((i) => (
+          <article className="invoice-row" key={i.id}>
+            <div className="invoice-main">
+              <strong>{i.title}</strong>
+              <span className="muted">
+                {i.source === "recurring" && !i.gmail_id ? "Maandelijkse kost" : i.supplier}
+                {i.invoice_number && ` · ${i.invoice_number}`}
+              </span>
+            </div>
+            <div className="invoice-value">
+              <span className="invoice-label">Bedrag</span>
+              <strong>{i.amount_cents === null ? "Nakijken" : money(i.amount_cents, "EUR")}</strong>
+            </div>
+            <div className="invoice-value">
+              <span className="invoice-label">Betaaldatum</span>
+              <strong>{i.due_date ? dateLabel(i.due_date, profile.timezone) : "Nakijken"}</strong>
+            </div>
+            <div className="invoice-state">
+              <PaidCheckbox id={i.id} paid={i.status === "paid"} title={i.title} />
+              <div className="invoice-badges">
+                {i.status === "pending" && i.due_date && i.due_date < today && (
+                  <span className="badge">Te laat</span>
+                )}
+                {i.needs_review && <span className="badge">Controleren</span>}
+              </div>
+            </div>
+            <div className="invoice-actions">
+              <details className="invoice-edit">
+                <summary>Wijzig</summary>
+                <div className="invoice-edit-form">
+                  <ActionForm action={editInvoice} submit="Opslaan">
+                    <InvoiceFields value={i} month={month} />
+                  </ActionForm>
+                </div>
+              </details>
+              {i.gmail_id && connection && (
+                <a
+                  className="text-link"
+                  href={`https://mail.google.com/mail/u/?authuser=${encodeURIComponent(connection.email_address)}#all/${encodeURIComponent(i.gmail_id)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open mail
+                </a>
+              )}
+              {i.gmail_id && <DismissInvoiceButton id={i.id} title={i.title} />}
+            </div>
+          </article>
+        ))}
       </div>
     ) : (
       <p className="muted">Geen facturen.</p>
@@ -140,7 +135,7 @@ export default async function Invoices({
           <button>Tonen</button>
         </form>
       </div>
-      <section className="panel">
+      <section className="panel invoice-summary">
         <dl className="totals">
           <div>
             <dt>Nog te betalen</dt>
@@ -149,6 +144,10 @@ export default async function Invoices({
           <div>
             <dt>Betaald deze maand</dt>
             <dd>{money(total(paid), "EUR")}</dd>
+          </div>
+          <div>
+            <dt>Open betalingen</dt>
+            <dd>{open.length}</dd>
           </div>
         </dl>
         <p className="muted">
@@ -208,17 +207,24 @@ export default async function Invoices({
           </section>
         </div>
         <aside className="stack">
-          <section className="panel">
-            <h2>Maandelijkse kost toevoegen</h2>
-            <ActionForm action={saveRecurringCost} submit="Toevoegen">
-              <InvoiceFields recurring month={today.slice(0, 7)} />
-            </ActionForm>
-          </section>
-          <section className="panel">
-            <h2>Eenmalige factuur</h2>
-            <ActionForm action={addInvoice} submit="Toevoegen">
-              <InvoiceFields month={month} />
-            </ActionForm>
+          <section className="panel invoice-tools">
+            <h2>Zelf toevoegen</h2>
+            <details open>
+              <summary>Maandelijkse kost</summary>
+              <div className="tool-form">
+                <ActionForm action={saveRecurringCost} submit="Toevoegen">
+                  <InvoiceFields recurring month={today.slice(0, 7)} />
+                </ActionForm>
+              </div>
+            </details>
+            <details>
+              <summary>Eenmalige factuur</summary>
+              <div className="tool-form">
+                <ActionForm action={addInvoice} submit="Toevoegen">
+                  <InvoiceFields month={month} />
+                </ActionForm>
+              </div>
+            </details>
           </section>
           <section className="panel">
             <h2>Facturen uit Gmail</h2>

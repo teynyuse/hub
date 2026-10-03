@@ -53,14 +53,17 @@ export function InvoiceFields({
         <>
           <label>
             Betaaldag van de maand
-            <input
+            <select
               name="day_of_month"
-              type="number"
-              min={1}
-              max={31}
-              required
               defaultValue={value && "day_of_month" in value ? value.day_of_month : 1}
-            />
+            >
+              {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
+                <option key={day} value={day}>
+                  Dag {day}
+                </option>
+              ))}
+            </select>
+            <span className="field-help">Dag 31 wordt de laatste dag in een kortere maand.</span>
           </label>
           <label>
             Vanaf maand
